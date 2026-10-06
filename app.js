@@ -2,7 +2,7 @@
 (function () {
   'use strict';
 
-  var APP_VERSION = '1.6.0';
+  var APP_VERSION = '1.6.1';
 
   /* ========= 清单配置：以后增改就改这里 =========
    * 每一项要有唯一且不再改动的 id（历史记录靠 id 对应）。
@@ -25,7 +25,7 @@
   var SCRIPTURES = {
     chanhui: {
       title: '忏悔文',
-      img: 'img/chanhui.jpg?v=9',
+      img: 'img/chanhui.jpg?v=10',
       lines: ['往昔所造诸恶业', '皆由无始贪嗔痴', '从身语意之所生', '今对佛前求忏悔',
               '罪从心起将心忏', '心若灭时罪亦亡', '心灭罪亡两俱空', '是则名为真忏悔']
     }
@@ -423,11 +423,9 @@
     ctx.restore();
   }
 
-  function shareMessage(k, s) {
-    var isToday = k === currentKey;
-    if (s.total > 0 && s.done >= s.total) return cheerFor(k);
-    if (s.done === 0) return isToday ? '新的一天，从一件小事开始。' : '这一天歇了歇，明天又是新的开始。';
-    return isToday ? '已完成 ' + s.done + ' 项，继续慢慢来。' : '这天完成了 ' + s.done + ' 项，一点一点来就好。';
+  // 分享图里只在 0 项的日子用到这句话
+  function shareMessage(k) {
+    return k === currentKey ? '新的一天，从一件小事开始。' : '这一天歇了歇，明天又是新的开始。';
   }
 
   function drawShare(k) {
@@ -471,8 +469,13 @@
       r.h = ROW[r.type] + (r.lines.length - 1) * r.lh;
     });
     var listH = rows.length ? 28 + rows.reduce(function (a, r) { return a + r.h; }, 0) + 20 : 0;
-    var listTop = 750;
-    var H = rows.length ? listTop + listH + 220 : 930;   // 0 项：不画清单卡片，只留那句话
+    var listTop = 460;   // 日期/星期下面直接接清单（v1.6.1 去掉了大数字、进度条和那句话）
+    var contentBottom = rows.length ? listTop + listH : listTop + 90;   // 0 项：清单位置只放一句温和的话
+    // 连续全勤：一行淡淡的小字，N ≥ 2 才显示
+    var streakText = '';
+    if (full && st >= 2) streakText = '连续全勤 ' + st + ' 天';
+    else if (!full && isToday && st >= 2) streakText = '已连续全勤 ' + st + ' 天';
+    var H = contentBottom + (streakText ? 70 : 0) + 210;
     cv.height = H;
     ctx.textBaseline = 'alphabetic';
 
@@ -497,40 +500,11 @@
     var rightX = W - PX;
     if (full) seal(ctx, rightX - 84, 304, 150);
 
-    // 进度
-    ctx.fillStyle = full ? C.green : C.green2; ctx.font = '700 150px ' + SERIF;
-    ctx.fillText(String(s.done), PX - 4, 548);
-    var nw = ctx.measureText(String(s.done)).width;
-    ctx.fillStyle = C.soft; ctx.font = '60px ' + SERIF;
-    ctx.fillText('/' + s.total, PX + nw + 4, 548);
-    var tw = ctx.measureText('/' + s.total).width;
-    ctx.font = '34px ' + SANS; ctx.fillStyle = C.soft;
-    ctx.fillText('项完成', PX + nw + tw + 20, 546);
-
-    // 连续全勤（右侧）
-    if (full || st > 0) {
-      var stLabel = full ? '连续全勤' : (isToday ? '已连续全勤' : '此前连续全勤');
-      ctx.textAlign = 'right';
-      ctx.fillStyle = C.soft; ctx.font = '34px ' + SANS; ctx.fillText(stLabel, rightX, 466);
-      ctx.fillText('天', rightX, 546);
-      var tianW = ctx.measureText('天').width;
-      ctx.fillStyle = full ? C.gold : C.green; ctx.font = '700 84px ' + SERIF; ctx.fillText(String(st), rightX - tianW - 12, 548);
-      ctx.textAlign = 'left';
+    // 0 项：清单区域只放一句温和的话
+    if (!rows.length) {
+      ctx.fillStyle = C.soft; ctx.font = '40px ' + SERIF;
+      ctx.fillText(shareMessage(k, s), PX, listTop + 64);
     }
-
-    // 进度条
-    var by = 592, bw = W - PX * 2;
-    rrect(ctx, PX, by, bw, 14, 7); ctx.fillStyle = C.track; ctx.fill();
-    if (s.ratio > 0) {
-      var g = ctx.createLinearGradient(PX, 0, PX + bw, 0);
-      g.addColorStop(0, C.green2); g.addColorStop(1, full ? C.gold : C.green);
-      rrect(ctx, PX, by, Math.max(14, bw * s.ratio), 14, 7); ctx.fillStyle = g; ctx.fill();
-    }
-
-    // 一句话
-    ctx.font = (full ? '700 ' : '') + '40px ' + SERIF;
-    ctx.fillStyle = full ? C.gold : C.soft;
-    ctx.fillText(shareMessage(k, s), PX, 686);
 
     // 清单卡片
     if (rows.length) {
@@ -568,6 +542,11 @@
       }
       y += h;
     });
+
+    if (streakText) {
+      ctx.fillStyle = C.faint; ctx.font = '30px ' + SANS;
+      ctx.fillText(streakText, PX, contentBottom + 62);
+    }
 
     // 落款
     ctx.textAlign = 'center';
