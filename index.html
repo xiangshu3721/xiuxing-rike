@@ -10,16 +10,16 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="修行日课">
-<link rel="manifest" href="manifest.webmanifest?v=2">
-<link rel="icon" type="image/png" sizes="64x64" href="icons/favicon-64.png?v=2">
-<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=2">
-<link rel="stylesheet" href="style.css?v=2">
+<link rel="manifest" href="manifest.webmanifest?v=3">
+<link rel="icon" type="image/png" sizes="64x64" href="icons/favicon-64.png?v=3">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=3">
+<link rel="stylesheet" href="style.css?v=3">
 </head>
 <body>
 <div class="app">
   <header class="top">
     <div class="brand">
-      <img class="logo" src="icons/icon-192.png?v=2" alt="" width="40" height="40">
+      <img class="logo" src="icons/icon-192.png?v=3" alt="" width="40" height="40">
       <div class="brand-text">
         <h1>修行日课</h1>
         <p class="sub">每天一点功课，慢慢来</p>
@@ -112,6 +112,20 @@
   </div>
 </div>
 
+<div id="sutraMask" class="mask sutra-mask" hidden>
+  <div class="sutra-scroll">
+    <div class="sutra-dialog" role="dialog" aria-modal="true" aria-labelledby="sutraTitle">
+      <div class="sutra-head">
+        <h3 id="sutraTitle">忏悔文</h3>
+        <button id="sutraClose" class="icon-btn" type="button" aria-label="关闭">×</button>
+      </div>
+      <img id="sutraImg" class="sutra-img" alt="忏悔文" width="860" height="993" decoding="async">
+      <p class="sutra-tip">长按图片可以保存</p>
+      <div id="sutraText" class="sutra-text"></div>
+    </div>
+  </div>
+</div>
+
 <div id="shareMask" class="mask share-mask" hidden>
   <div class="share-dialog" role="dialog" aria-modal="true" aria-label="分享图片预览">
     <div class="share-img-wrap"><img id="shareImg" alt="打卡分享图"></div>
@@ -124,6 +138,6 @@
   </div>
 </div>
 
-<script src="app.js?v=2"></script>
+<script src="app.js?v=3"></script>
 </body>
 </html>

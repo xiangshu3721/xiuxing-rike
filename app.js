@@ -2,7 +2,7 @@
 (function () {
   'use strict';
 
-  var APP_VERSION = '1.1.0';
+  var APP_VERSION = '1.2.0';
 
   /* ========= 清单配置：以后增改就改这里 =========
    * 每一项要有唯一且不再改动的 id（历史记录靠 id 对应）。
@@ -14,10 +14,20 @@
       { id: 'qingli-xiangfa', title: '清理想法&念头' }
     ] },
     { id: 'duansheli', title: '断舍离' },
-    { id: 'chanhuizhou', title: '10 遍忏悔咒' },
+    { id: 'chanhuizhou', title: '10 遍忏悔咒', scripture: 'chanhui' },
     { id: 'dazuo', title: '打坐🧘‍♂️' },
     { id: 'shaitaiyang', title: '晒太阳' }
   ];
+
+  /* 经文：清单项里写 scripture: 'xxx' 就会在那一项旁边出现「看经文」 */
+  var SCRIPTURES = {
+    chanhui: {
+      title: '忏悔文',
+      img: 'img/chanhui.jpg?v=3',
+      lines: ['往昔所造诸恶业', '皆由无始贪嗔痴', '从身语意之所生', '今对佛前求忏悔',
+              '罪从心起将心忏', '心若灭时罪亦亡', '心灭罪亡两俱空', '是则名为真忏悔']
+    }
+  };
 
   var DAY_START_HOUR = 5;             // 凌晨 5 点为一天的分界
   var STORE_KEY = 'xiuxing-rike.v1';
@@ -100,11 +110,12 @@
 
   /* ========= 今天视图 ========= */
   var CHECK_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.2 4.2L19 7"/></svg>';
-  function rowHtml(id, title, isGroup) {
+  function rowHtml(id, title, isGroup, scripture) {
     return '<label class="row' + (isGroup ? ' group-title' : '') + '">' +
       '<input type="checkbox" ' + (isGroup ? 'data-group="' + id + '"' : 'data-id="' + id + '"') + '>' +
       '<span class="box">' + CHECK_SVG + (isGroup ? '<span class="dash"></span>' : '') + '</span>' +
       '<span class="label">' + esc(title) + '</span>' +
+      (scripture && SCRIPTURES[scripture] ? '<button type="button" class="sutra-btn" data-sutra="' + scripture + '" aria-label="看' + esc(SCRIPTURES[scripture].title) + '">看经文</button>' : '') +
       (isGroup ? '<span class="count"></span>' : '<span class="time"></span>') +
       '</label>';
   }
@@ -113,10 +124,10 @@
     CHECKLIST.forEach(function (it) {
       if (it.children) {
         html += '<li class="group" data-gid="' + it.id + '">' + rowHtml(it.id, it.title, true) + '<ul class="sub-list">';
-        it.children.forEach(function (c) { html += '<li class="item sub" data-li="' + c.id + '">' + rowHtml(c.id, c.title, false) + '</li>'; });
+        it.children.forEach(function (c) { html += '<li class="item sub" data-li="' + c.id + '">' + rowHtml(c.id, c.title, false, c.scripture) + '</li>'; });
         html += '</ul></li>';
       } else {
-        html += '<li class="item" data-li="' + it.id + '">' + rowHtml(it.id, it.title, false) + '</li>';
+        html += '<li class="item" data-li="' + it.id + '">' + rowHtml(it.id, it.title, false, it.scripture) + '</li>';
       }
     });
     $('list').innerHTML = html;
@@ -543,6 +554,20 @@
   }
   function closeShare() { $('shareMask').hidden = true; }
 
+  /* ========= 经文弹层 ========= */
+  function openSutra(key) {
+    var sc = SCRIPTURES[key]; if (!sc) return;
+    $('sutraTitle').textContent = sc.title;
+    var img = $('sutraImg');
+    img.alt = sc.title + '（手写经文图）';
+    if (img.getAttribute('src') !== sc.img) img.src = sc.img;
+    $('sutraText').innerHTML = sc.lines.map(function (l) { return '<p>' + esc(l) + '</p>'; }).join('');
+    $('sutraMask').hidden = false;
+    $('sutraMask').scrollTop = 0;
+    $('sutraClose').focus({ preventScroll: true });
+  }
+  function closeSutra() { $('sutraMask').hidden = true; }
+
   /* ========= 导出 / 导入 / 清空 ========= */
   function exportData() {
     var out = { app: 'xiuxing-rike', version: 1, exportedAt: new Date().toISOString(), dayStartHour: DAY_START_HOUR,
@@ -636,12 +661,20 @@
     $('confirmNo').addEventListener('click', function () { $('confirmMask').hidden = true; });
     $('confirmYes').addEventListener('click', function () { $('confirmMask').hidden = true; clearAll(); });
     $('confirmMask').addEventListener('click', function (e) { if (e.target === this) this.hidden = true; });
+    // 看经文：按钮在 label 里，拦住点击，不触发打卡
+    $('list').addEventListener('click', function (e) {
+      var b = e.target.closest('[data-sutra]'); if (!b) return;
+      e.preventDefault(); e.stopPropagation();
+      openSutra(b.dataset.sutra);
+    });
+    $('sutraClose').addEventListener('click', closeSutra);
+    $('sutraMask').addEventListener('click', function (e) { if (e.target === this || e.target.classList.contains('sutra-scroll')) closeSutra(); });
     // 分享图
     $('shareTodayBtn').addEventListener('click', function () { checkRollover(); openShare(currentKey); });
     $('dayDetail').addEventListener('click', function (e) { if (e.target.closest('[data-share-day]')) openShare(selectedKey); });
     $('shareClose').addEventListener('click', closeShare);
     $('shareMask').addEventListener('click', function (e) { if (e.target === this) closeShare(); });
-    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') { closeShare(); $('confirmMask').hidden = true; } });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') { closeShare(); closeSutra(); $('confirmMask').hidden = true; } });
     $('shareNative').addEventListener('click', function () {
       if (!shareFile) return;
       navigator.share({ files: [shareFile], title: '修行日课' }).catch(function () {});
