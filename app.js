@@ -2,7 +2,7 @@
 (function () {
   'use strict';
 
-  var APP_VERSION = '1.6.1';
+  var APP_VERSION = '1.7.0';
 
   /* ========= 清单配置：以后增改就改这里 =========
    * 每一项要有唯一且不再改动的 id（历史记录靠 id 对应）。
@@ -25,7 +25,7 @@
   var SCRIPTURES = {
     chanhui: {
       title: '忏悔文',
-      img: 'img/chanhui.jpg?v=10',
+      img: 'img/chanhui.jpg?v=11',
       lines: ['往昔所造诸恶业', '皆由无始贪嗔痴', '从身语意之所生', '今对佛前求忏悔',
               '罪从心起将心忏', '心若灭时罪亦亡', '心灭罪亡两俱空', '是则名为真忏悔']
     }
@@ -65,7 +65,6 @@
   function todayKey() { return dayKeyOf(Date.now()); }
   function parseKey(k) { var p = k.split('-'); return new Date(+p[0], +p[1] - 1, +p[2], 12); }
   function addDays(k, n) { var d = parseKey(k); d.setDate(d.getDate() + n); return ymd(d); }
-  function hm(ts) { var d = new Date(ts); return pad(d.getHours()) + ':' + pad(d.getMinutes()); }
   function cnDate(k) { var d = parseKey(k); return (d.getMonth() + 1) + '月' + d.getDate() + '日'; }
   function weekOf(k) { return WEEK[parseKey(k).getDay()]; }
   function $(id) { return document.getElementById(id); }
@@ -139,7 +138,7 @@
       '<span class="label"><span class="tx">' + esc(title) + '</span></span>' +
       linkHtml(link) +
       (scripture && SCRIPTURES[scripture] ? '<button type="button" class="sutra-btn" data-sutra="' + scripture + '" aria-label="看' + esc(SCRIPTURES[scripture].title) + '">看经文</button>' : '') +
-      (isGroup ? '<span class="count"></span>' : '<span class="time"></span>') +
+      (isGroup ? '<span class="count"></span>' : '') +   // v1.7 起不显示完成时间（内部仍记录时间戳）
       '</label>';
   }
   function buildList() {
@@ -164,7 +163,6 @@
       var ts = day.done[l.id];
       input.checked = !!ts;
       li.classList.toggle('done', !!ts);
-      li.querySelector('.time').textContent = ts ? hm(ts) : '';
     });
     CHECKLIST.forEach(function (g) {
       if (!g.children) return;
@@ -327,7 +325,7 @@
     var list = ids.map(function (id) {
       var ts = day.done[id];
       return '<li class="' + (ts ? 'ok' : 'no') + '"><span class="mk">✓</span><span>' + esc(LABELS[id] || id) + '</span>' +
-        '<span class="t">' + (ts ? hm(ts) + ' 完成' : '未完成') + '</span></li>';
+        (ts ? '' : '<span class="t">未完成</span>') + '</li>';
     }).join('');
     $('dayDetail').innerHTML = head + '<ul class="detail-list">' + list + '</ul>' +
       (k === currentKey && s.done < s.total ? '<p class="empty" style="margin-top:8px">今天还没结束，明早 5 点前都还能勾。</p>' : '') + SHARE_DAY_BTN;
@@ -461,7 +459,7 @@
       r.fs = r.type === 'group' ? 46 : r.type === 'sub' ? 40 : 44;
       r.font = (r.type === 'group' ? '700 ' : '') + r.fs + 'px ' + SERIF;
       ctx.font = '32px ' + SANS;
-      var rightW = r.type === 'group' ? 70 : ctx.measureText('00:00 完成').width;
+      var rightW = r.type === 'group' ? 70 : 0;   // 不画完成时间
       var tx = r.bx + r.box + 28;
       ctx.font = r.font;
       r.lines = wrapLines(ctx, noEmoji(r.title), (cx0 + cw - 44) - rightW - 28 - tx);
@@ -536,9 +534,6 @@
         ctx.fillStyle = r.ts ? C.ink : C.faint;
         ctx.font = r.font;
         drawTitle(15);
-        ctx.textAlign = 'right'; ctx.font = '32px ' + SANS;
-        ctx.fillStyle = r.ts ? C.green2 : '#c2bcae';
-        ctx.fillText(r.ts ? hm(r.ts) + ' 完成' : '未完成', cx0 + cw - 44, mid + 11); ctx.textAlign = 'left';
       }
       y += h;
     });

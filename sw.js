@@ -1,19 +1,19 @@
 /* 修行日课 service worker
  * 页面（HTML）走「网络优先」，有网就拿最新版，没网才用缓存；
  * 静态资源都带 ?v= 版本号，走「缓存优先」。发新版时改下面的 VERSION 和 index.html 里的 ?v=。 */
-var VERSION = 'v10';
+var VERSION = 'v11';
 var CACHE = 'xiuxing-rike-' + VERSION;
 var ASSETS = [
   './',
   'index.html',
-  'style.css?v=10',
-  'app.js?v=10',
-  'manifest.webmanifest?v=10',
-  'icons/icon-192.png?v=10',
-  'icons/icon-512.png?v=10',
-  'icons/apple-touch-icon.png?v=10',
-  'icons/favicon-64.png?v=10',
-  'img/chanhui.jpg?v=10'
+  'style.css?v=11',
+  'app.js?v=11',
+  'manifest.webmanifest?v=11',
+  'icons/icon-192.png?v=11',
+  'icons/icon-512.png?v=11',
+  'icons/apple-touch-icon.png?v=11',
+  'icons/favicon-64.png?v=11',
+  'img/chanhui.jpg?v=11'
 ];
 
 self.addEventListener('install', function (e) {
