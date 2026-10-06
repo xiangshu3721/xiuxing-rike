@@ -2,7 +2,7 @@
 (function () {
   'use strict';
 
-  var APP_VERSION = '1.4.1';
+  var APP_VERSION = '1.4.2';
 
   /* ========= 清单配置：以后增改就改这里 =========
    * 每一项要有唯一且不再改动的 id（历史记录靠 id 对应）。
@@ -10,7 +10,7 @@
   var CHECKLIST = [
     { id: 'sanqingli', title: '三清理断舍离', children: [
       { id: 'qingli-huanjing', title: '清理环境' },
-      { id: 'qingli-shenti', title: '清理身体' },
+      { id: 'qingli-shenti', title: '清理身体和情绪' },
       { id: 'qingli-xiangfa', title: '清理信息&关系&想法&念头' }
     ] },
     // v1.3 起去掉了独立的「断舍离」（id: duansheli）。旧日子里的记录仍留在数据里，但不再显示、不参与计数。
@@ -23,7 +23,7 @@
   var SCRIPTURES = {
     chanhui: {
       title: '忏悔文',
-      img: 'img/chanhui.jpg?v=6',
+      img: 'img/chanhui.jpg?v=7',
       lines: ['往昔所造诸恶业', '皆由无始贪嗔痴', '从身语意之所生', '今对佛前求忏悔',
               '罪从心起将心忏', '心若灭时罪亦亡', '心灭罪亡两俱空', '是则名为真忏悔']
     }
