@@ -194,10 +194,11 @@ button{font:inherit;color:inherit}
   .row .time{font-size:12px;padding-left:4px}
 }
 
-/* v1.4 提醒卡 */
-.reminder{margin:22px 0 0;padding:22px 20px 20px;background:#faf6ee;border:1px solid #e3d5bf;border-radius:var(--radius);position:relative;
-  font-family:var(--serif);color:#4a463f;line-height:1.95;letter-spacing:.08em;font-size:15.5px;box-shadow:inset 0 0 0 4px #faf6ee,inset 0 0 0 5px #efe4d1}
+/* v1.4.1 提醒卡：低调，不抢清单 */
+.reminder{margin:26px 4px 0;padding:18px 2px 0;background:none;border:0;border-top:1px solid #ebe4d6;box-shadow:none;
+  font-family:var(--serif);font-size:14px;font-weight:400;line-height:1.9;letter-spacing:.06em;color:#9a9286}
 .reminder p{margin:0;overflow-wrap:anywhere}
-.rm-stanza + .rm-stanza{margin-top:1.1em}
-.rm-sign{text-align:right;font-size:13px;color:var(--ochre);margin-top:.9em!important;letter-spacing:.12em}
-.rm-end{margin-top:1.2em!important;padding-top:1em;border-top:1px dashed #e3d5bf;color:var(--ink);font-weight:600;line-height:1.85}
+.rm-stanza + .rm-stanza{margin-top:1.4em}
+.rm-sign{text-align:right;font-size:12.5px;color:#a8a194;margin-top:1.4em!important;letter-spacing:.1em}
+.rm-end{margin-top:1.4em!important;color:#7d766b;font-weight:400}
+.reminder + .hint{margin-top:24px}
