@@ -10,16 +10,16 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="修行日课">
-<link rel="manifest" href="manifest.webmanifest?v=12">
-<link rel="icon" type="image/png" sizes="64x64" href="icons/favicon-64.png?v=12">
-<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=12">
-<link rel="stylesheet" href="style.css?v=12">
+<link rel="manifest" href="manifest.webmanifest?v=13">
+<link rel="icon" type="image/png" sizes="64x64" href="icons/favicon-64.png?v=13">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=13">
+<link rel="stylesheet" href="style.css?v=13">
 </head>
 <body>
 <div class="app">
   <header class="top">
     <div class="brand">
-      <img class="logo" src="icons/icon-192.png?v=12" alt="" width="40" height="40">
+      <img class="logo" src="icons/icon-192.png?v=13" alt="" width="40" height="40">
       <div class="brand-text">
         <h1>修行日课</h1>
         <p class="sub">每天一点功课，慢慢来</p>
@@ -164,14 +164,20 @@
       </div>
 
       <div id="jc-f-stress" class="jc-field">
-        <div class="jc-label"><span id="jcStressLb">压力</span><span id="jcVal-stress" class="jc-val"></span></div>
-        <div id="jcStress" class="scores" role="radiogroup" aria-labelledby="jcStressLb"></div>
+        <div class="jc-label"><label for="jcRange-stress">压力</label><span class="jc-big"><b id="jcVal-stress">—</b><small>/10</small></span></div>
+        <div id="jcSl-stress" class="slider stress unset">
+          <input id="jcRange-stress" class="range" type="range" min="1" max="10" step="1" value="5" aria-valuetext="未选择">
+          <div class="ticks" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+        </div>
         <div class="scale"><span>1 很轻松</span><span>10 压力很大</span></div>
       </div>
 
       <div id="jc-f-energy" class="jc-field">
-        <div class="jc-label"><span id="jcEnergyLb">能量</span><span id="jcVal-energy" class="jc-val"></span></div>
-        <div id="jcEnergy" class="scores" role="radiogroup" aria-labelledby="jcEnergyLb"></div>
+        <div class="jc-label"><label for="jcRange-energy">能量</label><span class="jc-big"><b id="jcVal-energy">—</b><small>/10</small></span></div>
+        <div id="jcSl-energy" class="slider energy unset">
+          <input id="jcRange-energy" class="range" type="range" min="1" max="10" step="1" value="5" aria-valuetext="未选择">
+          <div class="ticks" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+        </div>
         <div class="scale"><span>1 很疲惫</span><span>10 很充沛</span></div>
       </div>
 
@@ -206,6 +212,6 @@
   </div>
 </div>
 
-<script src="app.js?v=12"></script>
+<script src="app.js?v=13"></script>
 </body>
 </html>

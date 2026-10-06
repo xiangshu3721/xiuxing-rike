@@ -2,7 +2,7 @@
 (function () {
   'use strict';
 
-  var APP_VERSION = '1.8.0';
+  var APP_VERSION = '1.8.1';
 
   /* ========= 清单配置：以后增改就改这里 =========
    * 每一项要有唯一且不再改动的 id（历史记录靠 id 对应）。
@@ -26,7 +26,7 @@
   var SCRIPTURES = {
     chanhui: {
       title: '忏悔文',
-      img: 'img/chanhui.jpg?v=12',
+      img: 'img/chanhui.jpg?v=13',
       lines: ['往昔所造诸恶业', '皆由无始贪嗔痴', '从身语意之所生', '今对佛前求忏悔',
               '罪从心起将心忏', '心若灭时罪亦亡', '心灭罪亡两俱空', '是则名为真忏悔']
     }
@@ -719,20 +719,57 @@
 
   /* ========= 「记录」弹层：天气预报觉察 ========= */
   var jcForm = { stress: 0, energy: 0, key: '' };
-  function scoreHtml(name) {
-    var h = '';
-    for (var i = 1; i <= 10; i++) h += '<button type="button" class="score" role="radio" aria-checked="false" data-score="' + name + '" data-v="' + i + '" aria-label="' + (name === 'stress' ? '压力 ' : '能量 ') + i + ' 分">' + i + '</button>';
-    return h;
-  }
+  /* 压力 / 能量：左右拖动的滑杆（1～10，步长 1）。
+   * 新建时是「未选择」（显示 —、滑块淡色，值 0），拖动、点按或用方向键动过才算选了。 */
+  var SLIDER_MID = 5;   // 未选择时滑块停在中间（只是位置，不算数）
+  function rangeEl(name) { return $('jcRange-' + name); }
   function setScore(name, v) {
+    v = v ? Math.max(1, Math.min(10, Math.round(v))) : 0;
+    var changed = jcForm[name] !== v;
     jcForm[name] = v;
-    document.querySelectorAll('[data-score="' + name + '"]').forEach(function (b) {
-      var on = +b.dataset.v === v;
-      b.classList.toggle('on', on); b.setAttribute('aria-checked', on);
+    var el = rangeEl(name), wrap = $('jcSl-' + name);
+    el.value = v || SLIDER_MID;
+    wrap.classList.toggle('unset', !v);
+    $('jc-f-' + name).classList.toggle('unset', !v);
+    wrap.style.setProperty('--f', v ? ((v - 1) / 9).toFixed(4) : '0');
+    el.setAttribute('aria-valuetext', v ? v + ' 分' : '未选择');
+    $('jcVal-' + name).textContent = v ? String(v) : '—';
+    if (v) $('jc-f-' + name).classList.remove('missing');
+    if (changed && $('jcErr').textContent) validateJuecha(true);
+  }
+  function valueFromX(el, clientX) {
+    var r = el.getBoundingClientRect();
+    var t = parseFloat(getComputedStyle(el).getPropertyValue('--thumb')) || 30;
+    var f = (clientX - r.left - t / 2) / Math.max(1, r.width - t);
+    return Math.round(1 + Math.max(0, Math.min(1, f)) * 9);
+  }
+  function bindSlider(name) {
+    var el = rangeEl(name), touch = null;
+    var pick = function () { setScore(name, +el.value); };
+    el.addEventListener('input', pick);
+    el.addEventListener('change', pick);
+    // 鼠标点在滑块上没挪动（值没变、不触发 input）也算选了
+    el.addEventListener('pointerup', function (e) { if (e.pointerType !== 'touch') pick(); });
+    el.addEventListener('keyup', function (e) { if (/^(Arrow|Home|End|Page)/.test(e.key)) pick(); });
+    // 触屏：点哪里跳到哪里、横向拖动跟手（iPhone 原生只能拖滑块本身）；竖向滑动是滚动页面，不算选
+    el.addEventListener('pointerdown', function (e) {
+      if (e.pointerType !== 'touch') return;
+      touch = { id: e.pointerId, x: e.clientX, y: e.clientY, moved: false };
     });
-    $('jc-f-' + name).classList.remove('missing');
-    $('jcVal-' + name).textContent = v ? v + ' 分' : '';
-    if ($('jcErr').textContent) validateJuecha(true);
+    el.addEventListener('pointermove', function (e) {
+      if (!touch || e.pointerId !== touch.id) return;
+      if (!touch.moved && Math.abs(e.clientX - touch.x) > 4 && Math.abs(e.clientX - touch.x) >= Math.abs(e.clientY - touch.y)) touch.moved = true;
+      if (touch.moved) setScore(name, valueFromX(el, e.clientX));
+    });
+    el.addEventListener('pointerup', function (e) {
+      if (!touch || e.pointerId !== touch.id) return;
+      if (Math.abs(e.clientY - touch.y) < 10 || touch.moved) setScore(name, valueFromX(el, e.clientX));
+      touch = null;
+    });
+    el.addEventListener('pointercancel', function () {
+      // 原生滑杆接管了拖动时也会 cancel：值变了的话 input 事件已经记下；这里不再改
+      touch = null;
+    });
   }
   function weatherInfo() {
     var w = $('jcWeather').value.trim();
@@ -809,12 +846,9 @@
     toast('已清除今天的觉察');
   }
   function initJuecha() {
-    $('jcStress').innerHTML = scoreHtml('stress');
-    $('jcEnergy').innerHTML = scoreHtml('energy');
+    bindSlider('stress'); bindSlider('energy');
     $('jcMask').addEventListener('click', function (e) {
-      if (e.target === this || e.target.classList.contains('jc-scroll')) { closeJuecha(); return; }
-      var b = e.target.closest('[data-score]');
-      if (b) setScore(b.dataset.score, +b.dataset.v);
+      if (e.target === this || e.target.classList.contains('jc-scroll')) closeJuecha();
     });
     $('jcWeather').addEventListener('input', function () { weatherInfo(); if ($('jcErr').textContent) validateJuecha(true); });
     $('jcForm').addEventListener('submit', function (e) { e.preventDefault(); saveJuecha(); });
