@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>修行日课</title>
+<meta name="description" content="修行日课：每天的功课清单，勾一项划一项，早上 5 点自动开始新的一天，打卡记录都留在本机。">
+<meta name="theme-color" content="#f5f0e6">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="修行日课">
+<link rel="manifest" href="manifest.webmanifest?v=1">
+<link rel="icon" type="image/png" sizes="64x64" href="icons/favicon-64.png?v=1">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=1">
+<link rel="stylesheet" href="style.css?v=1">
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div class="brand">
+      <img class="logo" src="icons/icon-192.png?v=1" alt="" width="40" height="40">
+      <div class="brand-text">
+        <h1>修行日课</h1>
+        <p class="sub">每天一点功课，慢慢来</p>
+      </div>
+    </div>
+  </header>
+
+  <div id="storageWarn" class="warn" hidden>
+    这个浏览器现在存不了数据（可能开了无痕模式或禁用了存储），关掉页面后今天的打卡会丢。换个普通窗口打开会更稳。
+  </div>
+
+  <nav class="tabs" role="tablist">
+    <button class="tab active" role="tab" data-view="today" aria-selected="true">今天</button>
+    <button class="tab" role="tab" data-view="records" aria-selected="false">打卡记录</button>
+  </nav>
+
+  <main class="views">
+    <section id="view-today" class="view active" aria-label="今天">
+      <div class="day-head">
+        <div class="date-line">
+          <span id="dateText" class="date-text"></span>
+          <span id="weekText" class="week-text"></span>
+        </div>
+        <p id="lateNote" class="late-note" hidden></p>
+        <div class="progress-line">
+          <span id="progressText" class="progress-text"></span>
+        </div>
+        <div class="bar" aria-hidden="true"><i id="progressBar"></i></div>
+        <p id="cheer" class="cheer" hidden></p>
+      </div>
+      <ul id="list" class="list"></ul>
+      <p class="hint">每天早上 5:00 自动换成新的一天，之前的打卡都存进「打卡记录」。</p>
+    </section>
+
+    <section id="view-records" class="view" aria-label="打卡记录">
+      <div class="stats">
+        <div class="stat"><b id="streakNow">0</b><span>连续全勤（天）</span></div>
+        <div class="stat"><b id="streakBest">0</b><span>最长连续（天）</span></div>
+        <div class="stat"><b id="monthFull">0</b><span>本月全勤（天）</span></div>
+      </div>
+      <p class="rule">全勤 = 当天 7 项都勾完。今天还没做完不算断，过了明早 5 点还没做完才断。</p>
+
+      <div class="card cal-card">
+        <div class="cal-head">
+          <button id="prevMonth" class="icon-btn" aria-label="上个月">‹</button>
+          <span id="monthTitle" class="month-title"></span>
+          <button id="nextMonth" class="icon-btn" aria-label="下个月">›</button>
+        </div>
+        <div class="cal-week"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span></div>
+        <div id="calGrid" class="cal-grid"></div>
+        <div class="legend"><span>少</span><i class="lv0"></i><i class="lv1"></i><i class="lv2"></i><i class="lv3"></i><i class="lv4"></i><span>全勤</span></div>
+      </div>
+
+      <div class="card" id="dayDetail"></div>
+
+      <div class="card">
+        <h2 class="card-title">近 30 天各项完成次数</h2>
+        <ul id="itemStats" class="item-stats"></ul>
+      </div>
+
+      <div class="card data-card">
+        <h2 class="card-title">数据备份</h2>
+        <p class="muted">记录只存在这台设备的浏览器里。换手机、清缓存之前，先导出一份。</p>
+        <div class="btn-row">
+          <button id="exportBtn" class="btn">导出数据</button>
+          <button id="importBtn" class="btn">导入数据</button>
+          <button id="clearBtn" class="btn btn-danger">清空全部记录</button>
+        </div>
+        <input id="importFile" type="file" accept="application/json,.json" hidden>
+      </div>
+    </section>
+  </main>
+
+  <footer class="foot">修行日课 · 数据只存在本机 · v<span id="ver"></span></footer>
+</div>
+
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+<div id="confirmMask" class="mask" hidden>
+  <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
+    <h3 id="confirmTitle">确定清空全部记录？</h3>
+    <p id="confirmBody">清空后所有打卡记录都会删掉，找不回来。建议先「导出数据」备份一份。</p>
+    <div class="btn-row end">
+      <button id="confirmNo" class="btn">先不了</button>
+      <button id="confirmYes" class="btn btn-danger-solid">确认清空</button>
+    </div>
+  </div>
+</div>
+
+<script src="app.js?v=1"></script>
+</body>
+</html>
