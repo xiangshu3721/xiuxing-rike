@@ -289,3 +289,47 @@ a.link-btn{text-decoration:none;display:inline-flex;align-items:center;gap:1px;w
 .item-stats .item-icon{width:1.2em;height:1.2em;margin-left:.15em}
 .item-icon .hd{fill:var(--green);stroke:none}
 .detail-list li.no .item-icon .hd{fill:var(--ink-faint)}
+
+/* v1.10 打卡日历：默认收起（一行头部）、展开轻柔；切月 / 年月选择 / 左右滑动 */
+.cal-card{padding:4px 14px}
+.cal-toggle{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;min-height:50px;padding:6px 0;border:0;background:none;cursor:pointer;text-align:left;color:var(--ink)}
+.ct-main{display:flex;align-items:baseline;flex-wrap:wrap;gap:2px 10px;min-width:0}
+.ct-title{font-family:var(--serif);font-size:16px;font-weight:700;letter-spacing:.08em}
+.ct-sum{font-size:13px;color:var(--ink-soft);font-variant-numeric:tabular-nums}
+.ct-act{flex:none;display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--green);padding:6px 2px 6px 8px}
+.ct-arrow{width:8px;height:8px;border-right:1.6px solid currentColor;border-bottom:1.6px solid currentColor;transform:translateY(-2px) rotate(45deg);transition:transform .3s ease}
+.cal-card.open .ct-arrow{transform:translateY(2px) rotate(-135deg)}
+.cal-body{display:grid;grid-template-rows:0fr;visibility:hidden;transition:grid-template-rows .32s cubic-bezier(.2,.7,.2,1),visibility 0s linear .32s}
+.cal-card.open .cal-body{grid-template-rows:1fr;visibility:visible;transition:grid-template-rows .32s cubic-bezier(.2,.7,.2,1),visibility 0s}
+.cal-inner{overflow:hidden;min-height:0}
+.cal-card.open .cal-inner{padding-bottom:10px}
+.cal-inner .cal-head{border-top:1px dashed var(--line);padding-top:10px;margin-bottom:2px}
+.cal-head .icon-btn{width:44px;height:44px}
+.month-title{border:0;background:none;padding:8px 10px;min-height:44px;cursor:pointer;color:var(--ink);border-radius:10px;font-family:var(--serif);font-size:17px;font-weight:700;letter-spacing:.06em}
+.month-title::after{content:"";display:inline-block;width:6px;height:6px;margin-left:8px;border-right:1.5px solid var(--ink-soft);border-bottom:1.5px solid var(--ink-soft);transform:translateY(-4px) rotate(45deg)}
+.month-title:active{background:var(--paper-2)}
+.cal-sub{display:flex;justify-content:center;min-height:6px}
+.cal-today{border:1px solid #e3d6bd;background:#f7efdf;color:#8a6a35;font-size:12.5px;border-radius:999px;padding:3px 12px;margin:0 0 6px;cursor:pointer;min-height:30px}
+.cal-grid{touch-action:pan-y}
+.cal-grid.slide-next{animation:calNext .26s ease}
+.cal-grid.slide-prev{animation:calPrev .26s ease}
+@keyframes calNext{from{opacity:.3;transform:translateX(18px)}to{opacity:1;transform:none}}
+@keyframes calPrev{from{opacity:.3;transform:translateX(-18px)}to{opacity:1;transform:none}}
+.ym-dialog{max-width:340px;padding:16px 16px 14px}
+.ym-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+.ym-head h3{margin:0}
+.ym-head .icon-btn{width:44px;height:44px}
+.ym-year{display:flex;align-items:center;justify-content:space-between;margin:4px 0 12px}
+.ym-year .icon-btn{width:44px;height:44px}
+.ym-y{font-family:var(--serif);font-size:20px;font-weight:700;letter-spacing:.08em;font-variant-numeric:tabular-nums}
+.ym-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.ym-m{position:relative;min-height:46px;border:1px solid var(--line);border-radius:10px;background:var(--paper);font-size:15px;cursor:pointer;color:var(--ink)}
+.ym-m.has::after{content:"";position:absolute;top:6px;right:7px;width:5px;height:5px;border-radius:50%;background:var(--gold)}
+.ym-m.now{box-shadow:inset 0 0 0 1.4px var(--ink)}
+.ym-m.on{background:var(--green);border-color:var(--green);color:#fff}
+.ym-m:disabled{background:transparent;border-style:dashed;color:var(--ink-faint);opacity:.6;cursor:default}
+.ym-m:not(:disabled):active{transform:scale(.96)}
+.ym-foot{display:flex;align-items:center;justify-content:space-between;margin-top:12px}
+.ym-tip{font-size:12px;color:var(--ink-faint);display:inline-flex;align-items:center;gap:5px}
+.ym-tip i{width:5px;height:5px;border-radius:50%;background:var(--gold)}
+@media (max-width:360px){ .cal-card{padding:4px 12px} .ct-sum{font-size:12.5px} .ym-grid{gap:6px} .month-title{font-size:16px;padding:8px 4px} }

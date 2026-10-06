@@ -2,7 +2,7 @@
 (function () {
   'use strict';
 
-  var APP_VERSION = '1.9.1';
+  var APP_VERSION = '1.10.0';
 
   /* ========= 清单配置：以后增改就改这里 =========
    * 每一项要有唯一且不再改动的 id（历史记录靠 id 对应）。
@@ -27,7 +27,7 @@
   var SCRIPTURES = {
     chanhui: {
       title: '忏悔文',
-      img: 'img/chanhui.jpg?v=15',
+      img: 'img/chanhui.jpg?v=16',
       lines: ['往昔所造诸恶业', '皆由无始贪嗔痴', '从身语意之所生', '今对佛前求忏悔',
               '罪从心起将心忏', '心若灭时罪亦亡', '心灭罪亡两俱空', '是则名为真忏悔']
     }
@@ -309,9 +309,21 @@
     if (s.ratio <= 2 / 3) return 2;
     return 3;
   }
-  function earliestMonth() {
-    var keys = Object.keys(data.days).sort();
-    return keys.length ? monthOf(keys[0]) : monthOf(currentKey);
+  var MIN_MONTH = '2000-01';   // 往前最多翻到这里（v1.10 起不再卡在「最早有记录的月份」）
+  function clampMonth(m) { var cur = monthOf(currentKey); return m > cur ? cur : m < MIN_MONTH ? MIN_MONTH : m; }
+  function monthLabel(m) {
+    var y = +m.slice(0, 4), mo = +m.slice(5, 7);
+    return (y === +currentKey.slice(0, 4) ? '' : y + '年') + mo + '月';
+  }
+  function monthCounts(m) {
+    var checked = 0, full = 0;
+    Object.keys(data.days).forEach(function (k) {
+      if (monthOf(k) !== m || k > currentKey) return;
+      var st = dayStat(k);
+      if (st && st.done > 0) checked++;
+      if (isFull(k)) full++;
+    });
+    return { checked: checked, full: full };
   }
   function shiftMonth(m, n) {
     var y = +m.slice(0, 4), mo = +m.slice(5, 7) - 1 + n;
@@ -324,13 +336,19 @@
     $('streakNow').textContent = st.now;
     $('streakBest').textContent = st.best;
     var curMonth = monthOf(currentKey);
-    $('monthFull').textContent = Object.keys(data.days).filter(function (k) { return monthOf(k) === curMonth && isFull(k); }).length;
+    viewMonth = clampMonth(viewMonth);
+    // 月度统计跟着日历所选的月份走；连续全勤是全局的，不变
+    var mc = monthCounts(viewMonth);
+    $('monthFull').textContent = mc.full;
+    $('monthFullLabel').textContent = (viewMonth === curMonth ? '本月' : monthLabel(viewMonth)) + '全勤（天）';
+    $('calSummary').textContent = monthLabel(viewMonth) + ' · 打卡 ' + mc.checked + ' 天 · 全勤 ' + mc.full + ' 天';
 
     // 月历
     var y = +viewMonth.slice(0, 4), m = +viewMonth.slice(5, 7);
     $('monthTitle').textContent = y + '年' + m + '月';
-    $('prevMonth').disabled = viewMonth <= earliestMonth();
-    $('nextMonth').disabled = viewMonth >= curMonth;
+    $('prevMonth').disabled = viewMonth <= MIN_MONTH;
+    $('nextMonth').disabled = viewMonth >= curMonth;   // 不能翻到未来
+    $('calToday').hidden = viewMonth === curMonth;
     var first = new Date(y, m - 1, 1);
     var lead = (first.getDay() + 6) % 7;      // 周一开头
     var days = new Date(y, m, 0).getDate();
@@ -354,6 +372,78 @@
     renderDetail();
     renderItemStats();
     renderTrend();
+  }
+
+  /* ========= 日历：展开 / 收起、切月、年月选择、左右滑动 ========= */
+  function setCalOpen(open) {
+    var card = $('calCard'), body = $('calBody');
+    card.classList.toggle('open', open);
+    $('calToggle').setAttribute('aria-expanded', open ? 'true' : 'false');
+    $('calToggleText').textContent = open ? '收起' : '展开';
+    if (open) body.removeAttribute('inert'); else body.setAttribute('inert', '');
+  }
+  function goMonth(m, anim) {
+    m = clampMonth(m);
+    if (m === viewMonth) return false;
+    var dir = m > viewMonth ? 'next' : 'prev';
+    viewMonth = m;
+    renderRecords();
+    if (anim !== false) {
+      var g = $('calGrid');
+      g.classList.remove('slide-next', 'slide-prev'); void g.offsetWidth; g.classList.add('slide-' + dir);
+    }
+    return true;
+  }
+  var ymYear = 0;
+  function renderYm() {
+    var cur = monthOf(currentKey), curY = +cur.slice(0, 4), html = '';
+    $('ymYear').textContent = ymYear + '年';
+    $('ymPrevYear').disabled = ymYear <= +MIN_MONTH.slice(0, 4);
+    $('ymNextYear').disabled = ymYear >= curY;
+    var has = {};
+    Object.keys(data.days).forEach(function (k) { var st = dayStat(k); if (st && st.done > 0) has[monthOf(k)] = 1; });
+    for (var i = 1; i <= 12; i++) {
+      var m = ymYear + '-' + pad(i), dis = m > cur || m < MIN_MONTH;
+      html += '<button type="button" class="ym-m' + (m === viewMonth ? ' on' : '') + (m === cur ? ' now' : '') + (has[m] ? ' has' : '') + '" data-ym="' + m + '"' +
+        (dis ? ' disabled' : '') + ' aria-label="' + ymYear + '年' + i + '月' + (dis ? '（还没到）' : '') + '">' + i + '月</button>';
+    }
+    $('ymGrid').innerHTML = html;
+  }
+  function openYm() { ymYear = +viewMonth.slice(0, 4); renderYm(); $('ymMask').hidden = false; $('ymClose').focus({ preventScroll: true }); }
+  function closeYm() { $('ymMask').hidden = true; }
+  function initCalendar() {
+    setCalOpen(false);   // 默认收起，不记住展开状态
+    $('calToggle').addEventListener('click', function () { setCalOpen(!$('calCard').classList.contains('open')); });
+    $('prevMonth').addEventListener('click', function () { goMonth(shiftMonth(viewMonth, -1)); });
+    $('nextMonth').addEventListener('click', function () { goMonth(shiftMonth(viewMonth, 1)); });
+    $('calToday').addEventListener('click', function () { goMonth(monthOf(currentKey)); });
+    $('monthTitle').addEventListener('click', openYm);
+    $('ymClose').addEventListener('click', closeYm);
+    $('ymMask').addEventListener('click', function (e) { if (e.target === this) closeYm(); });
+    $('ymPrevYear').addEventListener('click', function () { ymYear--; renderYm(); });
+    $('ymNextYear').addEventListener('click', function () { ymYear++; renderYm(); });
+    $('ymNow').addEventListener('click', function () { closeYm(); goMonth(monthOf(currentKey)); setCalOpen(true); });
+    $('ymGrid').addEventListener('click', function (e) {
+      var b = e.target.closest('[data-ym]'); if (!b || b.disabled) return;
+      closeYm(); goMonth(b.dataset.ym); setCalOpen(true);
+    });
+    // 手机上左右滑动切月：只认明显的水平滑动，竖向滚动不受影响
+    var sw = null, swipedAt = 0, body = $('calBody');
+    body.addEventListener('touchstart', function (e) {
+      sw = e.touches.length === 1 ? { x: e.touches[0].clientX, y: e.touches[0].clientY, t: Date.now() } : null;
+    }, { passive: true });
+    body.addEventListener('touchend', function (e) {
+      if (!sw || !e.changedTouches.length) return;
+      var dx = e.changedTouches[0].clientX - sw.x, dy = e.changedTouches[0].clientY - sw.y, dt = Date.now() - sw.t;
+      sw = null;
+      if (Math.abs(dx) >= 50 && Math.abs(dx) > Math.abs(dy) * 1.5 && dt < 900) {
+        if (goMonth(shiftMonth(viewMonth, dx < 0 ? 1 : -1))) swipedAt = Date.now();
+        else toast(dx < 0 ? '已经是本月了' : '不能再往前了');
+      }
+    }, { passive: true });
+    body.addEventListener('touchcancel', function () { sw = null; }, { passive: true });
+    // 滑动结束时手指下的那一天不要被当成点击
+    $('calGrid').addEventListener('click', function (e) { if (Date.now() - swipedAt < 450) { e.stopPropagation(); e.preventDefault(); } }, true);
   }
 
   var SHARE_DAY_BTN = '<div class="detail-share"><button class="btn btn-small" type="button" data-share-day>保存这一天的图片</button></div>';
@@ -584,7 +674,7 @@
 
   var shareIcons = [];
   function drawShare(k, forceStamp) {
-    lastStamp = null;   // 没全勤就没有印章
+    lastStamp = null;
     shareIcons = [];
     var day = data.days[k] || { items: LEAF_IDS.slice(), done: {} };
     var done = day.done || {};
@@ -665,7 +755,7 @@
     ctx.fillStyle = C.soft; ctx.font = '38px ' + SERIF;
     spaced(ctx, weekOf(k) + ' · ' + d.getFullYear() + '年', PX + 4, 396, 4);
     var rightX = W - PX;
-    if (full) seal(ctx, rightX - 84, 304, 150, forceStamp);   // 全勤才盖章，每次生成都重新随机
+    seal(ctx, rightX - 84, 304, 150, forceStamp);   // v1.10：不管打卡几项（含 0 项）都盖随机印章，每次生成都重新随机
 
     // 0 项：清单区域只放一句温和的话
     if (!rows.length) {
@@ -1029,7 +1119,7 @@
       b.classList.toggle('active', on); b.setAttribute('aria-selected', on);
     });
     document.querySelectorAll('.view').forEach(function (s) { s.classList.toggle('active', s.id === 'view-' + v); });
-    if (v === 'records') renderRecords();
+    if (v === 'records') { setCalOpen(false); renderRecords(); }   // 每次进入「打卡记录」日历默认收起
   }
 
   /* ========= 启动 ========= */
@@ -1050,8 +1140,7 @@
       var b = e.target.closest('[data-day]'); if (!b) return;
       selectedKey = b.dataset.day; renderRecords();
     });
-    $('prevMonth').addEventListener('click', function () { viewMonth = shiftMonth(viewMonth, -1); renderRecords(); });
-    $('nextMonth').addEventListener('click', function () { viewMonth = shiftMonth(viewMonth, 1); renderRecords(); });
+    initCalendar();
     $('exportBtn').addEventListener('click', exportData);
     $('importBtn').addEventListener('click', function () { $('importFile').click(); });
     $('importFile').addEventListener('change', function () {
@@ -1083,7 +1172,7 @@
     $('dayDetail').addEventListener('click', function (e) { if (e.target.closest('[data-share-day]')) openShare(selectedKey); });
     $('shareClose').addEventListener('click', closeShare);
     $('shareMask').addEventListener('click', function (e) { if (e.target === this) closeShare(); });
-    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') { closeShare(); closeSutra(); closeJuecha(); $('confirmMask').hidden = true; } });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') { closeShare(); closeSutra(); closeJuecha(); closeYm(); $('confirmMask').hidden = true; } });
     $('shareDownload').addEventListener('click', downloadShare);
 
     // 跨过 5 点自动换天：定时检查 + 回到页面时检查
