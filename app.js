@@ -2,7 +2,7 @@
 (function () {
   'use strict';
 
-  var APP_VERSION = '1.8.1';
+  var APP_VERSION = '1.9.0';
 
   /* ========= 清单配置：以后增改就改这里 =========
    * 每一项要有唯一且不再改动的 id（历史记录靠 id 对应）。
@@ -26,7 +26,7 @@
   var SCRIPTURES = {
     chanhui: {
       title: '忏悔文',
-      img: 'img/chanhui.jpg?v=13',
+      img: 'img/chanhui.jpg?v=14',
       lines: ['往昔所造诸恶业', '皆由无始贪嗔痴', '从身语意之所生', '今对佛前求忏悔',
               '罪从心起将心忏', '心若灭时罪亦亡', '心灭罪亡两俱空', '是则名为真忏悔']
     }
@@ -472,16 +472,95 @@
       ctx.fillStyle = '#fff'; ctx.fill(); ctx.strokeStyle = '#c3c8c3'; ctx.lineWidth = 3; ctx.stroke();
     }
   }
-  function seal(ctx, cx, cy, size) {
-    ctx.save(); ctx.translate(cx, cy); ctx.rotate(-8 * Math.PI / 180);
-    rrect(ctx, -size / 2, -size / 2, size, size, size * 0.14);
-    ctx.fillStyle = 'rgba(184,146,74,0.08)'; ctx.fill();
-    ctx.lineWidth = size * 0.05; ctx.strokeStyle = C.gold; ctx.stroke();
-    rrect(ctx, -size / 2 + size * 0.09, -size / 2 + size * 0.09, size * 0.82, size * 0.82, size * 0.09);
-    ctx.lineWidth = size * 0.015; ctx.stroke();
-    ctx.fillStyle = C.gold; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.font = '700 ' + Math.round(size * 0.3) + 'px ' + SERIF;
-    ctx.fillText('圆', 0, -size * 0.17); ctx.fillText('满', 0, size * 0.19);
+  /* ========= 全勤印章（v1.9：每次生成分享图都随机词 / 样式 / 颜色）========= */
+  // 鼓励词：中文最多两个字；英文是单个短词（最多 6 个字母，印章里横排）
+  var STAMP_WORDS_ZH = ['真棒', '优秀', '牛', '坚持', '圆满', '精进', '厉害', '给力', '漂亮', '满分', '超棒', '加油', '好样',
+    '稳', '赞', '自在', '清净', '善哉', '功成', '不错', '威武', '了得', '欢喜', '安然', '甚好', '妙', '绝了', '很强', '出色',
+    '完美', '极好', '赞叹', '喜乐', '光明', '吉祥', '如意', '有恒', '心安', '日新', '精彩', '帅', '好极'];
+  var STAMP_WORDS_EN = ['Nice', 'Good', 'Great', 'Cool', 'Wow', 'Yes', 'Bravo', 'Super', 'Top', 'Yay', 'Neat', 'Ace', 'Epic', 'Bingo'];
+  function isEnWord(w) { return /^[A-Za-z]+$/.test(w); }
+  var STAMP_WORDS = STAMP_WORDS_ZH.filter(function (w) { return Array.from(w).length <= 2; })
+    .concat(STAMP_WORDS_EN.filter(function (w) { return isEnWord(w) && w.length <= 6; }));
+  var EN_FONT = 'Georgia,"Times New Roman","Noto Serif","DejaVu Serif",serif';
+  // 东方配色（米白纸上都清楚，不用荧光色）
+  var STAMP_COLORS = [
+    { name: '朱砂', hex: '#b5382a' }, { name: '暖金', hex: '#a9823a' }, { name: '墨绿', hex: '#3f5e4f' },
+    { name: '靛青', hex: '#2e4a6b' }, { name: '赭石', hex: '#9a5a2e' }, { name: '胭脂', hex: '#a03650' }, { name: '紫檀', hex: '#6b3a3a' }
+  ];
+  // 样式：双线方章 / 圆章 / 椭圆章 / 圆角方 / 白文（实底）/ 八角章
+  var STAMP_SHAPES = [
+    { id: 'fang', name: '双线方章' }, { id: 'yuan', name: '圆章' }, { id: 'tuo', name: '椭圆章' },
+    { id: 'yuanjiao', name: '圆角方章' }, { id: 'baiwen', name: '白文实底' }, { id: 'bajiao', name: '八角章' }
+  ];
+  var lastStamp = null;
+  function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+  function randomStamp() {
+    // 词、样式、颜色、角度各自独立随机；角度在 -15° ~ +12° 之间
+    return { word: pick(STAMP_WORDS), color: pick(STAMP_COLORS), shape: pick(STAMP_SHAPES), angle: Math.round(-15 + Math.random() * 27) };
+  }
+  function hexA(hex, a) {
+    var n = parseInt(hex.slice(1), 16);
+    return 'rgba(' + (n >> 16 & 255) + ',' + (n >> 8 & 255) + ',' + (n & 255) + ',' + a + ')';
+  }
+  function stampPath(ctx, shape, w, h, inset) {
+    var x = -w / 2 + inset, y = -h / 2 + inset, ww = w - inset * 2, hh = h - inset * 2;
+    ctx.beginPath();
+    if (shape === 'yuan' || shape === 'tuo') { ctx.ellipse(0, 0, ww / 2, hh / 2, 0, 0, Math.PI * 2); return; }
+    if (shape === 'bajiao') {
+      var c = Math.min(ww, hh) * 0.29;
+      ctx.moveTo(x + c, y); ctx.lineTo(x + ww - c, y); ctx.lineTo(x + ww, y + c); ctx.lineTo(x + ww, y + hh - c);
+      ctx.lineTo(x + ww - c, y + hh); ctx.lineTo(x + c, y + hh); ctx.lineTo(x, y + hh - c); ctx.lineTo(x, y + c); ctx.closePath(); return;
+    }
+    var r = shape === 'yuanjiao' || shape === 'baiwen' ? Math.min(ww, hh) * 0.26 : Math.min(ww, hh) * 0.1;
+    rrect(ctx, x, y, ww, hh, r);
+  }
+  function seal(ctx, cx, cy, size, st) {
+    st = st || randomStamp();
+    lastStamp = { word: st.word, color: st.color.name, hex: st.color.hex, shape: st.shape.id, shapeName: st.shape.name, angle: st.angle };
+    var shape = st.shape.id, col = st.color.hex;
+    var w = shape === 'tuo' ? size * 0.8 : size * (shape === 'yuan' ? 1.04 : 1), h = shape === 'tuo' ? size * 1.1 : w;
+    ctx.save(); ctx.translate(cx, cy); ctx.rotate(st.angle * Math.PI / 180);
+    ctx.globalAlpha = 0.9 + Math.random() * 0.08;   // 印泥浓淡略有不同
+    var solid = shape === 'baiwen';
+    stampPath(ctx, shape, w, h, 0);
+    if (solid) { ctx.fillStyle = col; ctx.fill(); }
+    else {
+      ctx.fillStyle = hexA(col, 0.07); ctx.fill();
+      ctx.lineWidth = size * (shape === 'yuanjiao' ? 0.065 : 0.05); ctx.strokeStyle = col; ctx.stroke();
+      if (shape === 'fang' || shape === 'yuan' || shape === 'bajiao') {   // 双线
+        stampPath(ctx, shape, w, h, size * 0.09); ctx.lineWidth = size * 0.016; ctx.stroke();
+      }
+    }
+    // 字：英文横排（斜体衬线，字号按印面宽度自适应，上下两道细线）；中文两个字竖排，一个字居中放大
+    var chars = Array.from(st.word);
+    ctx.fillStyle = solid ? C.paper : col; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    if (isEnWord(st.word)) {
+      var maxW = size * (shape === 'tuo' ? 0.56 : shape === 'yuan' ? 0.68 : shape === 'bajiao' ? 0.66 : 0.72);
+      var efs = size * (st.word.length <= 3 ? 0.34 : 0.3);
+      ctx.font = 'italic 700 ' + Math.round(efs) + 'px ' + EN_FONT;
+      var tw = ctx.measureText(st.word).width;
+      if (tw > maxW) { efs = Math.floor(efs * maxW / tw * 10) / 10; ctx.font = 'italic 700 ' + efs + 'px ' + EN_FONT; tw = ctx.measureText(st.word).width; }
+      ctx.fillText(st.word, 0, size * 0.015);
+      var lw = Math.min(maxW, Math.max(tw * 0.75, size * 0.3)), ly = efs * 0.62 + size * 0.04;
+      ctx.fillRect(-lw / 2, -ly - size * 0.006, lw, size * 0.012);
+      ctx.fillRect(-lw / 2, ly + size * 0.024, lw, size * 0.012);
+    } else if (chars.length === 1) {
+      ctx.font = '700 ' + Math.round(size * (shape === 'tuo' ? 0.46 : 0.52)) + 'px ' + SERIF;
+      ctx.fillText(chars[0], 0, size * 0.02);
+    } else {
+      var fs = size * (shape === 'yuan' ? 0.27 : shape === 'bajiao' ? 0.28 : 0.3);
+      var gap = shape === 'tuo' ? size * 0.2 : shape === 'yuan' ? size * 0.155 : size * 0.175;
+      ctx.font = '700 ' + Math.round(fs) + 'px ' + SERIF;
+      ctx.fillText(chars[0], 0, -gap + size * 0.01); ctx.fillText(chars[1], 0, gap + size * 0.01);
+    }
+    // 做旧：印面里撒一些米白小点（印泥不均），点小、不挡字
+    ctx.globalAlpha = 1;
+    stampPath(ctx, shape, w + size * 0.06, h + size * 0.06, 0); ctx.clip();
+    for (var i = 0; i < 70; i++) {
+      var a = Math.random() * Math.PI * 2, d = Math.sqrt(Math.random()) * 0.55;
+      ctx.fillStyle = hexA(C.paper, 0.18 + Math.random() * (solid ? 0.35 : 0.3));
+      ctx.beginPath(); ctx.arc(Math.cos(a) * d * w, Math.sin(a) * d * h, size * (0.004 + Math.random() * 0.014), 0, Math.PI * 2); ctx.fill();
+    }
     ctx.restore();
   }
 
@@ -490,7 +569,8 @@
     return k === currentKey ? '新的一天，从一件小事开始。' : '这一天歇了歇，明天又是新的开始。';
   }
 
-  function drawShare(k) {
+  function drawShare(k, forceStamp) {
+    lastStamp = null;   // 没全勤就没有印章
     var day = data.days[k] || { items: LEAF_IDS.slice(), done: {} };
     var done = day.done || {};
     var s = dayStat(k) || { done: 0, total: leafIdsFor(k).length, ratio: 0 };
@@ -569,7 +649,7 @@
     ctx.fillStyle = C.soft; ctx.font = '38px ' + SERIF;
     spaced(ctx, weekOf(k) + ' · ' + d.getFullYear() + '年', PX + 4, 396, 4);
     var rightX = W - PX;
-    if (full) seal(ctx, rightX - 84, 304, 150);
+    if (full) seal(ctx, rightX - 84, 304, 150, forceStamp);   // 全勤才盖章，每次生成都重新随机
 
     // 0 项：清单区域只放一句温和的话
     if (!rows.length) {
@@ -996,7 +1076,14 @@
   }
 
   // 给测试和调试用的只读入口
-  window.__rike = { todayKey: todayKey, drawShare: function (k) { return drawShare(k).toDataURL('image/png'); }, data: function () { return data; }, importText: importText, version: APP_VERSION, openJuecha: openJuecha };
+  window.__rike = { todayKey: todayKey, drawShare: function (k) { return drawShare(k).toDataURL('image/png'); }, data: function () { return data; }, importText: importText, version: APP_VERSION, openJuecha: openJuecha,
+    lastStamp: function () { return lastStamp; },
+    // 调试 / 测试用：指定印章画一张（word 文字、color 颜色名、shape 样式 id、angle 角度）
+    drawShareWith: function (k, o) {
+      var c = STAMP_COLORS.filter(function (x) { return x.name === o.color; })[0] || STAMP_COLORS[0];
+      var sh = STAMP_SHAPES.filter(function (x) { return x.id === o.shape; })[0] || STAMP_SHAPES[0];
+      return drawShare(k, { word: String(o.word || '圆满'), color: c, shape: sh, angle: +o.angle || 0 }).toDataURL('image/png');
+    }, stampWords: STAMP_WORDS.slice(), stampWordsEn: STAMP_WORDS_EN.slice(), stampColors: STAMP_COLORS.map(function (c) { return c.name; }), stampShapes: STAMP_SHAPES.map(function (x) { return x.id; }) };
 
   init();
 })();
