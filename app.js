@@ -2,7 +2,7 @@
 (function () {
   'use strict';
 
-  var APP_VERSION = '1.9.0';
+  var APP_VERSION = '1.9.1';
 
   /* ========= 清单配置：以后增改就改这里 =========
    * 每一项要有唯一且不再改动的 id（历史记录靠 id 对应）。
@@ -18,7 +18,8 @@
     // record：这一项不能直接勾，要点「记录」写下天气 / 压力 / 能量，保存后自动完成（v1.8 起）
     { id: 'tianqi-juecha', title: '天气预报觉察', since: '2026-10-06', record: true },
     { id: 'chanhuizhou', title: '10 遍忏悔咒', scripture: 'chanhui' },
-    { id: 'dazuo', title: '打坐🧘‍♂️' },
+    // icon：名字旁的小图标（自绘线条 SVG，见下面 ICONS；v1.0 起名字里是 🧘‍♂️ emoji，分享图一直把 emoji 去掉了，v1.9.1 改成自绘图标三处一致）
+    { id: 'dazuo', title: '打坐', icon: 'dazuo' },
     { id: 'shaitaiyang', title: '晒太阳' }
   ];
 
@@ -26,7 +27,7 @@
   var SCRIPTURES = {
     chanhui: {
       title: '忏悔文',
-      img: 'img/chanhui.jpg?v=14',
+      img: 'img/chanhui.jpg?v=15',
       lines: ['往昔所造诸恶业', '皆由无始贪嗔痴', '从身语意之所生', '今对佛前求忏悔',
               '罪从心起将心忏', '心若灭时罪亦亡', '心灭罪亡两俱空', '是则名为真忏悔']
     }
@@ -43,12 +44,24 @@
     '心定了，今天就圆满了。'
   ];
 
+  /* 清单项小图标：24×24 线条路径，页面用内联 SVG、分享图用 Canvas Path2D 画同一份，iPhone / 安卓 / 微信显示一致 */
+  var ICONS = {
+    // 盘腿打坐的小人：实心头 + 身子 + 两手搭膝 + 盘起的腿
+    dazuo: { label: '打坐', head: [12, 4.3, 2.6],
+      d: 'M8.7 15.3c.3-4 1.4-7.3 3.3-7.3s3 3.3 3.3 7.3 M9.1 10.2c-1.8 1.3-3.2 3.1-4.3 5.2 M14.9 10.2c1.8 1.3 3.2 3.1 4.3 5.2 M2.4 18c3-2 6.2-2.7 9.6-2.7s6.6.7 9.6 2.7 M2.4 18c3 1.8 6.2 2.6 9.6 2.6s6.6-.8 9.6-2.6' }
+  };
+  function iconSvg(key) {
+    var ic = ICONS[key]; if (!ic) return '';
+    return '<svg class="item-icon" data-icon="' + key + '" viewBox="0 0 24 24" aria-hidden="true" focusable="false">' +
+      (ic.head ? '<circle class="hd" cx="' + ic.head[0] + '" cy="' + ic.head[1] + '" r="' + ic.head[2] + '"/>' : '') + '<path d="' + ic.d + '"/></svg>';
+  }
+
   /* ========= 工具 ========= */
   var LEAVES = [];   // 可勾项（目前 7 个）
-  var LABELS = {};
+  var LABELS = {}, ICON_OF = {};
   CHECKLIST.forEach(function (it) {
-    if (it.children) it.children.forEach(function (c) { LEAVES.push(c); LABELS[c.id] = c.title; });
-    else { LEAVES.push(it); LABELS[it.id] = it.title; }
+    if (it.children) it.children.forEach(function (c) { LEAVES.push(c); LABELS[c.id] = c.title; if (c.icon) ICON_OF[c.id] = c.icon; });
+    else { LEAVES.push(it); LABELS[it.id] = it.title; if (it.icon) ICON_OF[it.id] = it.icon; }
   });
   var LEAF_IDS = LEAVES.map(function (l) { return l.id; });
   var CN_NUM = ['零', '一', '两', '三', '四', '五', '六', '七', '八', '九', '十', '十一', '十二'];
@@ -157,7 +170,7 @@
     return '<label class="row' + (isGroup ? ' group-title' : '') + '">' +
       '<input type="checkbox" ' + (isGroup ? 'data-group="' + id + '"' : 'data-id="' + id + '"') + '>' +
       '<span class="box">' + CHECK_SVG + (isGroup ? '<span class="dash"></span>' : '') + '</span>' +
-      '<span class="label"><span class="tx">' + esc(title) + '</span></span>' +
+      '<span class="label"><span class="tx">' + esc(title) + '</span>' + (isGroup ? '' : iconSvg(ICON_OF[id])) + '</span>' +
       linkHtml(link) +
       (scripture && SCRIPTURES[scripture] ? '<button type="button" class="sutra-btn" data-sutra="' + scripture + '" aria-label="看' + esc(SCRIPTURES[scripture].title) + '">看经文</button>' : '') +
       (record ? '<button type="button" class="sutra-btn record-btn" data-record="' + id + '" aria-label="记录' + esc(title) + '">记录</button>' : '') +
@@ -357,7 +370,7 @@
     var list = ids.map(function (id) {
       var ts = day.done[id];
       var note = id === RECORD_ID && ts && jc ? '<span class="jc-sub">' + esc(juechaText(jc)) + '</span>' : '';
-      return '<li class="' + (ts ? 'ok' : 'no') + '"' + (id === RECORD_ID ? ' data-detail="' + id + '"' : '') + '><span class="mk">✓</span><span>' + esc(LABELS[id] || id) + note + '</span>' +
+      return '<li class="' + (ts ? 'ok' : 'no') + '"' + (id === RECORD_ID ? ' data-detail="' + id + '"' : '') + '><span class="mk">✓</span><span>' + esc(LABELS[id] || id) + iconSvg(ICON_OF[id]) + note + '</span>' +
         (ts ? '' : '<span class="t">未完成</span>') + '</li>';
     }).join('');
     $('dayDetail').innerHTML = head + '<ul class="detail-list">' + list + '</ul>' +
@@ -369,7 +382,7 @@
     for (var i = 0; i < 30; i++) keys.push(addDays(currentKey, -i));
     var html = LEAVES.map(function (l) {
       var n = keys.filter(function (k) { var d = data.days[k]; return d && d.done && d.done[l.id]; }).length;
-      return '<li data-stat="' + l.id + '"><span class="nm">' + esc(l.title) + '</span><span class="tr"><i style="width:' + (n / 30 * 100) + '%"></i></span><span class="n">' + n + ' 次</span></li>';
+      return '<li data-stat="' + l.id + '"><span class="nm">' + esc(l.title) + iconSvg(l.icon) + '</span><span class="tr"><i style="width:' + (n / 30 * 100) + '%"></i></span><span class="n">' + n + ' 次</span></li>';
     }).join('');
     $('itemStats').innerHTML = html;
   }
@@ -569,8 +582,10 @@
     return k === currentKey ? '新的一天，从一件小事开始。' : '这一天歇了歇，明天又是新的开始。';
   }
 
+  var shareIcons = [];
   function drawShare(k, forceStamp) {
     lastStamp = null;   // 没全勤就没有印章
+    shareIcons = [];
     var day = data.days[k] || { items: LEAF_IDS.slice(), done: {} };
     var done = day.done || {};
     var s = dayStat(k) || { done: 0, total: leafIdsFor(k).length, ratio: 0 };
@@ -586,10 +601,10 @@
         var doneKids = it.children.filter(function (c) { return done[c.id] && eff.indexOf(c.id) >= 0; });
         if (!doneKids.length) return;
         rows.push({ type: 'group', title: it.title, n: doneKids.length, total: it.children.length });
-        doneKids.forEach(function (c) { rows.push({ type: 'sub', title: c.title, ts: done[c.id] }); });
+        doneKids.forEach(function (c) { rows.push({ type: 'sub', title: c.title, ts: done[c.id], icon: c.icon }); });
       } else if (done[it.id] && eff.indexOf(it.id) >= 0) {
         var jc = it.id === RECORD_ID ? juechaOf(day) : null;
-        rows.push({ type: 'item', title: it.title, ts: done[it.id], note: jc ? juechaText(jc) : '' });   // 觉察：下面附一行小字（不含时间）
+        rows.push({ type: 'item', title: it.title, ts: done[it.id], note: jc ? juechaText(jc) : '', icon: it.icon });   // 觉察：下面附一行小字（不含时间）
       }
     });
 
@@ -609,7 +624,8 @@
       var rightW = r.type === 'group' ? 70 : 0;   // 不画完成时间
       var tx = r.bx + r.box + 28;
       ctx.font = r.font;
-      r.lines = wrapLines(ctx, noEmoji(r.title), (cx0 + cw - 44) - rightW - 28 - tx);
+      r.iconS = r.icon && ICONS[r.icon] ? Math.round(r.fs * 1.3) : 0;   // 图标约一个字高，跟在名字后面
+      r.lines = wrapLines(ctx, noEmoji(r.title), (cx0 + cw - 44) - rightW - 28 - tx - (r.iconS ? r.iconS + 14 : 0));
       r.lh = Math.round(r.fs * 1.32);
       r.h = ROW[r.type] + (r.lines.length - 1) * r.lh;
       r.titleH = r.h;
@@ -687,6 +703,17 @@
         ctx.fillStyle = r.ts ? C.ink : C.faint;
         ctx.font = r.font;
         drawTitle(15);
+        if (r.iconS) {
+          var lastLn = r.lines[r.lines.length - 1], ibase = firstBase(15) + (r.lines.length - 1) * r.lh;
+          var ix = bx + box + 28 + ctx.measureText(lastLn).width + 12, iy = ibase - r.fs * 1.08;
+          ctx.save(); ctx.translate(ix, iy); ctx.scale(r.iconS / 24, r.iconS / 24);
+          ctx.strokeStyle = C.green; ctx.fillStyle = C.green; ctx.lineWidth = 1.9; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+          ctx.stroke(new Path2D(ICONS[r.icon].d));
+          var hd = ICONS[r.icon].head;
+          if (hd) { ctx.beginPath(); ctx.arc(hd[0], hd[1], hd[2], 0, Math.PI * 2); ctx.fill(); }
+          ctx.restore();
+          shareIcons.push({ icon: r.icon, x: Math.round(ix), y: Math.round(iy), s: r.iconS });
+        }
         if (r.noteLines) {
           ctx.fillStyle = C.soft; ctx.font = NOTE_FONT;
           var nb = firstBase(15) + (r.lines.length - 1) * r.lh + 52;
@@ -1077,7 +1104,7 @@
 
   // 给测试和调试用的只读入口
   window.__rike = { todayKey: todayKey, drawShare: function (k) { return drawShare(k).toDataURL('image/png'); }, data: function () { return data; }, importText: importText, version: APP_VERSION, openJuecha: openJuecha,
-    lastStamp: function () { return lastStamp; },
+    lastStamp: function () { return lastStamp; }, shareIcons: function () { return shareIcons.slice(); },
     // 调试 / 测试用：指定印章画一张（word 文字、color 颜色名、shape 样式 id、angle 角度）
     drawShareWith: function (k, o) {
       var c = STAMP_COLORS.filter(function (x) { return x.name === o.color; })[0] || STAMP_COLORS[0];

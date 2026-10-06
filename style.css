@@ -280,3 +280,12 @@ a.link-btn{text-decoration:none;display:inline-flex;align-items:center;gap:1px;w
 .ticks{position:absolute;left:calc(var(--thumb) / 2 + 2px);right:calc(var(--thumb) / 2 + 2px);top:calc(50% + 9px);display:flex;justify-content:space-between;pointer-events:none}
 .ticks i{width:2px;height:5px;border-radius:1px;background:#d8cfbd}
 .slider + .scale{margin-top:2px}
+
+/* v1.9.1 清单项小图标（打坐小人）：自绘线条，墨绿，约一个字高；勾完后跟着变淡 */
+.item-icon{display:inline-block;width:1.4em;height:1.4em;vertical-align:-.32em;margin-left:.2em;fill:none;stroke:var(--green);stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.done > .row .item-icon{opacity:.55}
+.detail-list .item-icon{width:1.25em;height:1.25em}
+.detail-list li.no .item-icon{stroke:var(--ink-faint)}
+.item-stats .item-icon{width:1.2em;height:1.2em;margin-left:.15em}
+.item-icon .hd{fill:var(--green);stroke:none}
+.detail-list li.no .item-icon .hd{fill:var(--ink-faint)}
