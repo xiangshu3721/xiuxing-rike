@@ -2,7 +2,7 @@
 (function () {
   'use strict';
 
-  var APP_VERSION = '1.5.0';
+  var APP_VERSION = '1.6.0';
 
   /* ========= 清单配置：以后增改就改这里 =========
    * 每一项要有唯一且不再改动的 id（历史记录靠 id 对应）。
@@ -15,6 +15,8 @@
     ] },
     // v1.3 起去掉了独立的「断舍离」（id: duansheli）。旧日子里的记录仍留在数据里，但不再显示、不参与计数。
     { id: 'chanhuizhou', title: '10 遍忏悔咒', scripture: 'chanhui' },
+    // since：从哪一天（按 5 点分界的日期）开始生效。之前的日子没有这一项，不算进当天的完成数和全勤
+    { id: 'tianqi-juecha', title: '天气预报觉察', since: '2026-10-06' },
     { id: 'dazuo', title: '打坐🧘‍♂️' },
     { id: 'shaitaiyang', title: '晒太阳' }
   ];
@@ -23,7 +25,7 @@
   var SCRIPTURES = {
     chanhui: {
       title: '忏悔文',
-      img: 'img/chanhui.jpg?v=8',
+      img: 'img/chanhui.jpg?v=9',
       lines: ['往昔所造诸恶业', '皆由无始贪嗔痴', '从身语意之所生', '今对佛前求忏悔',
               '罪从心起将心忏', '心若灭时罪亦亡', '心灭罪亡两俱空', '是则名为真忏悔']
     }
@@ -41,7 +43,7 @@
   ];
 
   /* ========= 工具 ========= */
-  var LEAVES = [];   // 可勾项（目前 6 个）
+  var LEAVES = [];   // 可勾项（目前 7 个）
   var LABELS = {};
   CHECKLIST.forEach(function (it) {
     if (it.children) it.children.forEach(function (c) { LEAVES.push(c); LABELS[c.id] = c.title; });
@@ -49,7 +51,13 @@
   });
   var LEAF_IDS = LEAVES.map(function (l) { return l.id; });
   var CN_NUM = ['零', '一', '两', '三', '四', '五', '六', '七', '八', '九', '十', '十一', '十二'];
-  CHEERS = CHEERS.map(function (c) { return c.replace('{N}', CN_NUM[LEAF_IDS.length] || String(LEAF_IDS.length)); });
+  // 某一天生效的清单：去掉的项不算；带 since 的项只从那天起算
+  function leavesFor(k) { return LEAVES.filter(function (l) { return !l.since || k >= l.since; }); }
+  function leafIdsFor(k) { return leavesFor(k).map(function (l) { return l.id; }); }
+  function cheerFor(k) {
+    var n = leafIdsFor(k).length;
+    return CHEERS[parseKey(k).getDate() % CHEERS.length].replace('{N}', CN_NUM[n] || String(n));
+  }
 
   function pad(n) { return (n < 10 ? '0' : '') + n; }
   function ymd(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
@@ -103,8 +111,8 @@
   function dayStat(k) {
     var day = data.days[k];
     if (!day) return null;
-    // 一律按“当前清单”计数：已经去掉的项（如旧的断舍离）不算，旧日子做完当前这几项也算全勤
-    var items = LEAF_IDS;
+    // 按“当天生效的清单”计数：已经去掉的项（如旧的断舍离）不算；新加的项（天气预报觉察）只从加入那天起算
+    var items = leafIdsFor(k);
     var n = 0;
     items.forEach(function (id) { if (day.done && day.done[id]) n++; });
     return { done: n, total: items.length, ratio: items.length ? n / items.length : 0 };
@@ -178,8 +186,8 @@
     $('progressBar').parentNode.classList.toggle('full', s.done === s.total);
     var cheer = $('cheer');
     if (s.done === s.total) {
-      var idx = parseKey(currentKey).getDate() % CHEERS.length;
-      if (cheer.hidden || cheer.textContent !== CHEERS[idx]) { cheer.textContent = CHEERS[idx]; cheer.hidden = false; }
+      var line = cheerFor(currentKey);
+      if (cheer.hidden || cheer.textContent !== line) { cheer.textContent = line; cheer.hidden = false; }
     } else cheer.hidden = true;
     document.title = '修行日课 · ' + s.done + '/' + s.total;
   }
@@ -315,7 +323,7 @@
       (k === currentKey ? '（今天）' : '') + '</h2>' +
       (s ? '<span class="ratio">完成 ' + s.done + '/' + s.total + (s.done >= s.total ? ' · 全勤' : '') + '</span>' : '') + '</div>';
     if (!day) { $('dayDetail').innerHTML = head + '<p class="empty">这天没有打开过，没有记录。</p>' + SHARE_DAY_BTN; return; }
-    var ids = LEAF_IDS.slice();   // 只显示当前清单里的项
+    var ids = leafIdsFor(k);   // 只显示那天生效的清单项
     var list = ids.map(function (id) {
       var ts = day.done[id];
       return '<li class="' + (ts ? 'ok' : 'no') + '"><span class="mk">✓</span><span>' + esc(LABELS[id] || id) + '</span>' +
@@ -417,7 +425,7 @@
 
   function shareMessage(k, s) {
     var isToday = k === currentKey;
-    if (s.total > 0 && s.done >= s.total) return CHEERS[parseKey(k).getDate() % CHEERS.length];
+    if (s.total > 0 && s.done >= s.total) return cheerFor(k);
     if (s.done === 0) return isToday ? '新的一天，从一件小事开始。' : '这一天歇了歇，明天又是新的开始。';
     return isToday ? '已完成 ' + s.done + ' 项，继续慢慢来。' : '这天完成了 ' + s.done + ' 项，一点一点来就好。';
   }
@@ -425,7 +433,8 @@
   function drawShare(k) {
     var day = data.days[k] || { items: LEAF_IDS.slice(), done: {} };
     var done = day.done || {};
-    var s = dayStat(k) || { done: 0, total: LEAF_IDS.length, ratio: 0 };
+    var s = dayStat(k) || { done: 0, total: leafIdsFor(k).length, ratio: 0 };
+    var eff = leafIdsFor(k);
     var full = s.total > 0 && s.done >= s.total;
     var isToday = k === currentKey;
     var st = streakAt(k);
@@ -434,11 +443,11 @@
     var rows = [];
     CHECKLIST.forEach(function (it) {
       if (it.children) {
-        var doneKids = it.children.filter(function (c) { return done[c.id]; });
+        var doneKids = it.children.filter(function (c) { return done[c.id] && eff.indexOf(c.id) >= 0; });
         if (!doneKids.length) return;
         rows.push({ type: 'group', title: it.title, n: doneKids.length, total: it.children.length });
         doneKids.forEach(function (c) { rows.push({ type: 'sub', title: c.title, ts: done[c.id] }); });
-      } else if (done[it.id]) rows.push({ type: 'item', title: it.title, ts: done[it.id] });
+      } else if (done[it.id] && eff.indexOf(it.id) >= 0) rows.push({ type: 'item', title: it.title, ts: done[it.id] });
     });
 
     var W = 1080, PX = 96;
@@ -597,11 +606,14 @@
     img.src = dataUrl;   // 预览用 data URL：微信 / iOS 长按保存最稳
     img.alt = '修行日课 ' + cnDate(k) + ' 打卡图';
     img.setAttribute('data-day', k);
-    var wx = isWeChat(), touch = isTouch() || isIOS();
-    $('shareDownload').hidden = wx;   // 微信里下载不可用，只提示长按
+    var wx = isWeChat();
+    // 能直接下载的环境（电脑、安卓 Chrome 等）：生成后直接下载，不弹预览
+    if (canDirectDownload()) { triggerDownload(); return; }
+    // iOS（Safari / 主屏）、微信、不支持下载的浏览器：弹预览，长按保存
     $('shareHint').classList.remove('emph');
     $('shareHint').textContent = wx ? '长按图片，选择「保存图片」或「发送给朋友」'
-      : touch ? '长按图片保存到相册，或点「下载图片」' : '点「下载图片」保存到电脑';
+      : isIOS() ? '长按图片保存，选择「存储到照片」' : '长按图片保存';
+    $('shareDownload').hidden = wx || !isIOS();   // 预览层里的按钮只给 iOS Safari 用（新页面打开图片）
     $('shareMask').hidden = false;
   }
   function longPressHint(msg) {
@@ -609,10 +621,20 @@
     h.textContent = msg; h.classList.remove('emph'); void h.offsetWidth; h.classList.add('emph');
     toast(msg);
   }
+  function canDirectDownload() {
+    return !isIOS() && !isWeChat() && !!shareState.url && ('download' in document.createElement('a'));
+  }
+  function triggerDownload() {
+    var a = document.createElement('a');
+    a.href = shareState.url; a.download = shareState.name; a.rel = 'noopener'; a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function () { a.remove(); }, 1000);
+    toast('已保存到下载');
+  }
   function downloadShare() {
     var st = shareState;
     if (!st.dataUrl) return;
-    var url = st.url || st.dataUrl;
     var canDownload = 'download' in document.createElement('a');
     if (isIOS() || !canDownload || !st.url) {
       // iOS（含 iPadOS、主屏模式）不支持把图片直接下载到相册：
@@ -625,12 +647,7 @@
       longPressHint(isIOS() ? '请长按上方图片，选择「存储到照片」' : '请长按上方图片保存');
       return;
     }
-    var a = document.createElement('a');
-    a.href = url; a.download = st.name; a.rel = 'noopener'; a.style.display = 'none';
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(function () { a.remove(); }, 1000);
-    toast(isTouch() ? '已开始下载；如果没反应，请长按上方图片保存' : '已开始下载，可在浏览器的下载列表里找到');
+    triggerDownload();
   }
   function closeShare() { $('shareMask').hidden = true; }
 
@@ -713,7 +730,7 @@
   /* ========= 启动 ========= */
   function init() {
     $('ver').textContent = APP_VERSION;
-    $('ruleCount').textContent = LEAF_IDS.length;
+    $('ruleCount').textContent = leafIdsFor(currentKey).length;
     if (!storageOk) $('storageWarn').hidden = false;
     buildList();
     ensureDay(currentKey);
