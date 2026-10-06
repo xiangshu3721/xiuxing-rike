@@ -2,18 +2,18 @@
 (function () {
   'use strict';
 
-  var APP_VERSION = '1.2.0';
+  var APP_VERSION = '1.3.0';
 
   /* ========= 清单配置：以后增改就改这里 =========
    * 每一项要有唯一且不再改动的 id（历史记录靠 id 对应）。
    * 带 children 的是一组，组本身不计数，只算子项。          */
   var CHECKLIST = [
-    { id: 'sanqingli', title: '三清理', children: [
+    { id: 'sanqingli', title: '三清理断舍离', children: [
       { id: 'qingli-huanjing', title: '清理环境' },
       { id: 'qingli-shenti', title: '清理身体' },
-      { id: 'qingli-xiangfa', title: '清理想法&念头' }
+      { id: 'qingli-xiangfa', title: '清理信息&关系&想法&念头' }
     ] },
-    { id: 'duansheli', title: '断舍离' },
+    // v1.3 起去掉了独立的「断舍离」（id: duansheli）。旧日子里的记录仍留在数据里，但不再显示、不参与计数。
     { id: 'chanhuizhou', title: '10 遍忏悔咒', scripture: 'chanhui' },
     { id: 'dazuo', title: '打坐🧘‍♂️' },
     { id: 'shaitaiyang', title: '晒太阳' }
@@ -23,7 +23,7 @@
   var SCRIPTURES = {
     chanhui: {
       title: '忏悔文',
-      img: 'img/chanhui.jpg?v=3',
+      img: 'img/chanhui.jpg?v=4',
       lines: ['往昔所造诸恶业', '皆由无始贪嗔痴', '从身语意之所生', '今对佛前求忏悔',
               '罪从心起将心忏', '心若灭时罪亦亡', '心灭罪亡两俱空', '是则名为真忏悔']
     }
@@ -34,20 +34,22 @@
   var WEEK = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
   var CHEERS = [
     '今天的功课都做完了，辛苦了。',
-    '七项圆满，好好歇一歇。',
+    '{N}项圆满，好好歇一歇。',
     '日日是好日，今天也是。',
     '一点一点做，已经很好了。',
     '心定了，今天就圆满了。'
   ];
 
   /* ========= 工具 ========= */
-  var LEAVES = [];   // 7 个可勾项
+  var LEAVES = [];   // 可勾项（目前 6 个）
   var LABELS = {};
   CHECKLIST.forEach(function (it) {
     if (it.children) it.children.forEach(function (c) { LEAVES.push(c); LABELS[c.id] = c.title; });
     else { LEAVES.push(it); LABELS[it.id] = it.title; }
   });
   var LEAF_IDS = LEAVES.map(function (l) { return l.id; });
+  var CN_NUM = ['零', '一', '两', '三', '四', '五', '六', '七', '八', '九', '十', '十一', '十二'];
+  CHEERS = CHEERS.map(function (c) { return c.replace('{N}', CN_NUM[LEAF_IDS.length] || String(LEAF_IDS.length)); });
 
   function pad(n) { return (n < 10 ? '0' : '') + n; }
   function ymd(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
@@ -101,7 +103,8 @@
   function dayStat(k) {
     var day = data.days[k];
     if (!day) return null;
-    var items = day.items && day.items.length ? day.items : LEAF_IDS;
+    // 一律按“当前清单”计数：已经去掉的项（如旧的断舍离）不算，旧日子做完当前这几项也算全勤
+    var items = LEAF_IDS;
     var n = 0;
     items.forEach(function (id) { if (day.done && day.done[id]) n++; });
     return { done: n, total: items.length, ratio: items.length ? n / items.length : 0 };
@@ -114,7 +117,7 @@
     return '<label class="row' + (isGroup ? ' group-title' : '') + '">' +
       '<input type="checkbox" ' + (isGroup ? 'data-group="' + id + '"' : 'data-id="' + id + '"') + '>' +
       '<span class="box">' + CHECK_SVG + (isGroup ? '<span class="dash"></span>' : '') + '</span>' +
-      '<span class="label">' + esc(title) + '</span>' +
+      '<span class="label"><span class="tx">' + esc(title) + '</span></span>' +
       (scripture && SCRIPTURES[scripture] ? '<button type="button" class="sutra-btn" data-sutra="' + scripture + '" aria-label="看' + esc(SCRIPTURES[scripture].title) + '">看经文</button>' : '') +
       (isGroup ? '<span class="count"></span>' : '<span class="time"></span>') +
       '</label>';
@@ -300,8 +303,7 @@
       (k === currentKey ? '（今天）' : '') + '</h2>' +
       (s ? '<span class="ratio">完成 ' + s.done + '/' + s.total + (s.done >= s.total ? ' · 全勤' : '') + '</span>' : '') + '</div>';
     if (!day) { $('dayDetail').innerHTML = head + '<p class="empty">这天没有打开过，没有记录。</p>' + SHARE_DAY_BTN; return; }
-    var ids = (day.items && day.items.length ? day.items : LEAF_IDS).slice();
-    Object.keys(day.done || {}).forEach(function (id) { if (ids.indexOf(id) < 0) ids.push(id); });
+    var ids = LEAF_IDS.slice();   // 只显示当前清单里的项
     var list = ids.map(function (id) {
       var ts = day.done[id];
       return '<li class="' + (ts ? 'ok' : 'no') + '"><span class="mk">✓</span><span>' + esc(LABELS[id] || id) + '</span>' +
@@ -345,6 +347,21 @@
     chars.forEach(function (c) { ctx.fillText(c, cx, y); cx += ctx.measureText(c).width + gap; });
     ctx.textAlign = oldAlign;
     return w;
+  }
+  function wrapLines(ctx, text, maxW) {
+    // 优先在 & 或空格后断行，放不下再按字断
+    var tokens = text.match(/[^&\s]+[&\s]*|[&\s]+/g) || [text];
+    var lines = [], cur = '';
+    tokens.forEach(function (t) {
+      if (ctx.measureText(cur + t).width <= maxW) { cur += t; return; }
+      if (cur) { lines.push(cur.trim()); cur = ''; }
+      Array.from(t).forEach(function (ch) {
+        if (ctx.measureText(cur + ch).width > maxW && cur) { lines.push(cur); cur = ''; }
+        cur += ch;
+      });
+    });
+    if (cur.trim()) lines.push(cur.trim());
+    return lines.length ? lines : [text];
   }
   function rrect(ctx, x, y, w, h, r) {
     ctx.beginPath();
@@ -401,7 +418,7 @@
     var isToday = k === currentKey;
     var st = streakAt(k);
 
-    // 行：按当前清单结构画（三清理为一组）；那天有、但清单里已删掉的项附在后面
+    // 行：按当前清单结构画（三清理断舍离为一组）；已从清单去掉的项不画
     var rows = [];
     CHECKLIST.forEach(function (it) {
       if (it.children) {
@@ -410,15 +427,31 @@
         it.children.forEach(function (c) { rows.push({ type: 'sub', title: c.title, ts: done[c.id] }); });
       } else rows.push({ type: 'item', title: it.title, ts: done[it.id] });
     });
-    Object.keys(done).forEach(function (id) { if (LEAF_IDS.indexOf(id) < 0) rows.push({ type: 'item', title: LABELS[id] || id, ts: done[id] }); });
 
     var W = 1080, PX = 96;
     var ROW = { group: 104, sub: 92, item: 108 };
-    var listH = 28 + rows.reduce(function (a, r) { return a + ROW[r.type]; }, 0) + 20;
+    var cx0 = PX - 16, cw = W - (PX - 16) * 2;
+    var cv = document.createElement('canvas'); cv.width = W; cv.height = 10;
+    var ctx = cv.getContext('2d');
+    // 先量好每行要几行字（长名字自动换行）
+    rows.forEach(function (r) {
+      var indent = r.type === 'sub' ? 64 : 0;
+      r.box = r.type === 'sub' ? 44 : 50;
+      r.bx = cx0 + 40 + indent;
+      r.fs = r.type === 'group' ? 46 : r.type === 'sub' ? 40 : 44;
+      r.font = (r.type === 'group' ? '700 ' : '') + r.fs + 'px ' + SERIF;
+      ctx.font = '32px ' + SANS;
+      var rightW = r.type === 'group' ? 70 : ctx.measureText('00:00 完成').width;
+      var tx = r.bx + r.box + 28;
+      ctx.font = r.font;
+      r.lines = wrapLines(ctx, noEmoji(r.title), (cx0 + cw - 44) - rightW - 28 - tx);
+      r.lh = Math.round(r.fs * 1.32);
+      r.h = ROW[r.type] + (r.lines.length - 1) * r.lh;
+    });
+    var listH = 28 + rows.reduce(function (a, r) { return a + r.h; }, 0) + 20;
     var listTop = 750;
     var H = listTop + listH + 220;
-    var cv = document.createElement('canvas'); cv.width = W; cv.height = H;
-    var ctx = cv.getContext('2d');
+    cv.height = H;
     ctx.textBaseline = 'alphabetic';
 
     // 底色 + 双线框
@@ -478,15 +511,15 @@
     ctx.fillText(shareMessage(k, s), PX, 686);
 
     // 清单卡片
-    var cx0 = PX - 16, cw = W - (PX - 16) * 2;
     rrect(ctx, cx0, listTop, cw, listH, 28); ctx.fillStyle = C.card; ctx.fill();
     ctx.strokeStyle = C.line; ctx.lineWidth = 2; ctx.stroke();
     var y = listTop + 28;
     rows.forEach(function (r, i) {
-      var h = ROW[r.type];
-      var indent = r.type === 'sub' ? 64 : 0;
-      var bx = cx0 + 40 + indent, box = r.type === 'sub' ? 44 : 50;
+      var h = r.h, indent = r.type === 'sub' ? 64 : 0;
+      var bx = r.bx, box = r.box;
       var mid = y + h / 2;
+      var firstBase = function (off) { return mid + off - (r.lines.length - 1) * r.lh / 2; };
+      var drawTitle = function (off) { r.lines.forEach(function (ln, j) { ctx.fillText(ln, bx + box + 28, firstBase(off) + j * r.lh); }); };
       if (i > 0) {
         ctx.save(); ctx.strokeStyle = '#ebe4d6'; ctx.lineWidth = 2;
         if (r.type === 'sub') ctx.setLineDash([8, 8]);
@@ -496,15 +529,15 @@
         var gdone = r.n === r.total;
         checkBox(ctx, bx, mid - box / 2, box, gdone);
         if (!gdone && r.n > 0) { ctx.fillStyle = C.green; rrect(ctx, bx + 13, mid - 3, box - 26, 6, 3); ctx.fill(); }
-        ctx.fillStyle = gdone || r.n ? C.ink : C.faint; ctx.font = '700 46px ' + SERIF;
-        ctx.fillText(noEmoji(r.title), bx + box + 28, mid + 16);
+        ctx.fillStyle = gdone || r.n ? C.ink : C.faint; ctx.font = r.font;
+        drawTitle(16);
         ctx.textAlign = 'right'; ctx.fillStyle = gdone ? C.green : C.soft; ctx.font = '34px ' + SANS;
         ctx.fillText(r.n + '/' + r.total, cx0 + cw - 44, mid + 12); ctx.textAlign = 'left';
       } else {
         checkBox(ctx, bx, mid - box / 2, box, !!r.ts);
         ctx.fillStyle = r.ts ? C.ink : C.faint;
-        ctx.font = (r.type === 'sub' ? '40px ' : '44px ') + SERIF;
-        ctx.fillText(noEmoji(r.title), bx + box + 28, mid + 15);
+        ctx.font = r.font;
+        drawTitle(15);
         ctx.textAlign = 'right'; ctx.font = '32px ' + SANS;
         ctx.fillStyle = r.ts ? C.green2 : '#c2bcae';
         ctx.fillText(r.ts ? hm(r.ts) + ' 完成' : '未完成', cx0 + cw - 44, mid + 11); ctx.textAlign = 'left';
@@ -633,6 +666,7 @@
   /* ========= 启动 ========= */
   function init() {
     $('ver').textContent = APP_VERSION;
+    $('ruleCount').textContent = LEAF_IDS.length;
     if (!storageOk) $('storageWarn').hidden = false;
     buildList();
     ensureDay(currentKey);

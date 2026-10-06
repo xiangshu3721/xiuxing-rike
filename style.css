@@ -175,3 +175,21 @@ button{font:inherit;color:inherit}
 .sutra-text p{margin:0}
 .row .sutra-btn{margin-left:auto}
 .row .sutra-btn + .time{margin-left:10px}
+
+/* v1.3 长名字换行 + 多行删除线 */
+.row .label{flex:0 1 auto;min-width:0;line-height:1.45;padding:2px 0;overflow-wrap:anywhere}
+.label::after{content:none}
+.label .tx{background:linear-gradient(var(--ink-soft),var(--ink-soft)) no-repeat 0 58%/0% 1.5px;-webkit-box-decoration-break:slice;box-decoration-break:slice;transition:background-size .36s cubic-bezier(.4,.1,.2,1)}
+.done > .row .label .tx,.row.done .label .tx{background-size:100% 1.5px}
+.row .time,.row .count{flex:none;white-space:nowrap;padding-left:8px}
+.detail-list li > span:nth-child(2){min-width:0;overflow-wrap:anywhere}
+.detail-list .t{flex:none;white-space:nowrap;padding-left:8px}
+.item-stats li{grid-template-columns:minmax(0,8.5em) 1fr 3.4em}
+.item-stats .nm{white-space:normal;overflow:visible;text-overflow:clip;line-height:1.4;overflow-wrap:anywhere}
+.box > *{grid-area:1/1}
+@media (max-width:360px){
+  .row{gap:9px;padding-left:12px;padding-right:12px}
+  .sub-list .row{padding-left:22px}
+  .sutra-btn{padding:2px 7px;font-size:12px}
+  .row .time{font-size:12px;padding-left:4px}
+}
