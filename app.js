@@ -2,7 +2,7 @@
 (function () {
   'use strict';
 
-  var APP_VERSION = '1.4.2';
+  var APP_VERSION = '1.5.0';
 
   /* ========= 清单配置：以后增改就改这里 =========
    * 每一项要有唯一且不再改动的 id（历史记录靠 id 对应）。
@@ -10,7 +10,7 @@
   var CHECKLIST = [
     { id: 'sanqingli', title: '三清理断舍离', children: [
       { id: 'qingli-huanjing', title: '清理环境' },
-      { id: 'qingli-shenti', title: '清理身体和情绪' },
+      { id: 'qingli-shenti', title: '清理身体和情绪', link: { text: '回春叩问', href: 'https://xiangshu3721.github.io/huichun/', title: '打开《回春明点叩问》' } },
       { id: 'qingli-xiangfa', title: '清理信息&关系&想法&念头' }
     ] },
     // v1.3 起去掉了独立的「断舍离」（id: duansheli）。旧日子里的记录仍留在数据里，但不再显示、不参与计数。
@@ -23,7 +23,7 @@
   var SCRIPTURES = {
     chanhui: {
       title: '忏悔文',
-      img: 'img/chanhui.jpg?v=7',
+      img: 'img/chanhui.jpg?v=8',
       lines: ['往昔所造诸恶业', '皆由无始贪嗔痴', '从身语意之所生', '今对佛前求忏悔',
               '罪从心起将心忏', '心若灭时罪亦亡', '心灭罪亡两俱空', '是则名为真忏悔']
     }
@@ -113,11 +113,23 @@
 
   /* ========= 今天视图 ========= */
   var CHECK_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.2 4.2L19 7"/></svg>';
-  function rowHtml(id, title, isGroup, scripture) {
+  // 外链：手机/微信里在当前页打开（返回后打卡状态从本地存储恢复），电脑上开新标签
+  function linkTarget() {
+    var wx = /MicroMessenger/i.test(navigator.userAgent);
+    var coarse = window.matchMedia && matchMedia('(pointer:coarse)').matches;
+    return wx || coarse ? '' : ' target="_blank" rel="noopener"';
+  }
+  function linkHtml(link) {
+    if (!link || !/^https:\/\//.test(link.href)) return '';
+    return '<a class="sutra-btn link-btn" data-ext href="' + esc(link.href) + '"' + linkTarget() +
+      ' title="' + esc(link.title || link.text) + '">' + esc(link.text) + '<span class="ext-arrow" aria-hidden="true">↗</span></a>';
+  }
+  function rowHtml(id, title, isGroup, scripture, link) {
     return '<label class="row' + (isGroup ? ' group-title' : '') + '">' +
       '<input type="checkbox" ' + (isGroup ? 'data-group="' + id + '"' : 'data-id="' + id + '"') + '>' +
       '<span class="box">' + CHECK_SVG + (isGroup ? '<span class="dash"></span>' : '') + '</span>' +
       '<span class="label"><span class="tx">' + esc(title) + '</span></span>' +
+      linkHtml(link) +
       (scripture && SCRIPTURES[scripture] ? '<button type="button" class="sutra-btn" data-sutra="' + scripture + '" aria-label="看' + esc(SCRIPTURES[scripture].title) + '">看经文</button>' : '') +
       (isGroup ? '<span class="count"></span>' : '<span class="time"></span>') +
       '</label>';
@@ -127,10 +139,10 @@
     CHECKLIST.forEach(function (it) {
       if (it.children) {
         html += '<li class="group" data-gid="' + it.id + '">' + rowHtml(it.id, it.title, true) + '<ul class="sub-list">';
-        it.children.forEach(function (c) { html += '<li class="item sub" data-li="' + c.id + '">' + rowHtml(c.id, c.title, false, c.scripture) + '</li>'; });
+        it.children.forEach(function (c) { html += '<li class="item sub" data-li="' + c.id + '">' + rowHtml(c.id, c.title, false, c.scripture, c.link) + '</li>'; });
         html += '</ul></li>';
       } else {
-        html += '<li class="item" data-li="' + it.id + '">' + rowHtml(it.id, it.title, false, it.scripture) + '</li>';
+        html += '<li class="item" data-li="' + it.id + '">' + rowHtml(it.id, it.title, false, it.scripture, it.link) + '</li>';
       }
     });
     $('list').innerHTML = html;
@@ -418,14 +430,15 @@
     var isToday = k === currentKey;
     var st = streakAt(k);
 
-    // 行：按当前清单结构画（三清理断舍离为一组）；已从清单去掉的项不画
+    // 行：只画已完成的项（按当前清单结构，组里有完成的子项才画组标题）；没完成的、已从清单去掉的都不画
     var rows = [];
     CHECKLIST.forEach(function (it) {
       if (it.children) {
-        var n = it.children.filter(function (c) { return done[c.id]; }).length;
-        rows.push({ type: 'group', title: it.title, n: n, total: it.children.length });
-        it.children.forEach(function (c) { rows.push({ type: 'sub', title: c.title, ts: done[c.id] }); });
-      } else rows.push({ type: 'item', title: it.title, ts: done[it.id] });
+        var doneKids = it.children.filter(function (c) { return done[c.id]; });
+        if (!doneKids.length) return;
+        rows.push({ type: 'group', title: it.title, n: doneKids.length, total: it.children.length });
+        doneKids.forEach(function (c) { rows.push({ type: 'sub', title: c.title, ts: done[c.id] }); });
+      } else if (done[it.id]) rows.push({ type: 'item', title: it.title, ts: done[it.id] });
     });
 
     var W = 1080, PX = 96;
@@ -448,9 +461,9 @@
       r.lh = Math.round(r.fs * 1.32);
       r.h = ROW[r.type] + (r.lines.length - 1) * r.lh;
     });
-    var listH = 28 + rows.reduce(function (a, r) { return a + r.h; }, 0) + 20;
+    var listH = rows.length ? 28 + rows.reduce(function (a, r) { return a + r.h; }, 0) + 20 : 0;
     var listTop = 750;
-    var H = listTop + listH + 220;
+    var H = rows.length ? listTop + listH + 220 : 930;   // 0 项：不画清单卡片，只留那句话
     cv.height = H;
     ctx.textBaseline = 'alphabetic';
 
@@ -511,8 +524,10 @@
     ctx.fillText(shareMessage(k, s), PX, 686);
 
     // 清单卡片
-    rrect(ctx, cx0, listTop, cw, listH, 28); ctx.fillStyle = C.card; ctx.fill();
-    ctx.strokeStyle = C.line; ctx.lineWidth = 2; ctx.stroke();
+    if (rows.length) {
+      rrect(ctx, cx0, listTop, cw, listH, 28); ctx.fillStyle = C.card; ctx.fill();
+      ctx.strokeStyle = C.line; ctx.lineWidth = 2; ctx.stroke();
+    }
     var y = listTop + 28;
     rows.forEach(function (r, i) {
       var h = r.h, indent = r.type === 'sub' ? 64 : 0;
@@ -555,35 +570,67 @@
     return cv;
   }
 
-  var shareBlobUrl = null, shareFile = null;
+  var shareState = { url: '', name: '', dataUrl: '' };
   function isWeChat() { return /MicroMessenger/i.test(navigator.userAgent); }
   function isTouch() { return window.matchMedia && matchMedia('(pointer:coarse)').matches; }
+  function isIOS() {
+    var ua = navigator.userAgent;
+    return /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  }
+  function isStandalone() {
+    return navigator.standalone === true || (window.matchMedia && matchMedia('(display-mode: standalone)').matches);
+  }
+  function dataUrlToBlob(dataUrl) {
+    var parts = dataUrl.split(','), bin = atob(parts[1]), n = bin.length, arr = new Uint8Array(n);
+    for (var i = 0; i < n; i++) arr[i] = bin.charCodeAt(i);
+    return new Blob([arr], { type: 'image/png' });
+  }
   function openShare(k) {
     var cv;
     try { cv = drawShare(k); } catch (e) { toast('图片生成失败了，请再试一次'); return; }
-    var url = cv.toDataURL('image/png');
-    var name = '修行日课-' + k + '.png';
+    var dataUrl = cv.toDataURL('image/png');
+    // 旧的 blob 链接稍后释放（给可能刚打开的新页面留时间）
+    if (shareState.url) { var old = shareState.url; setTimeout(function () { URL.revokeObjectURL(old); }, 60000); }
+    shareState = { dataUrl: dataUrl, name: '修行日课-' + k + '.png', url: '' };
+    try { shareState.url = URL.createObjectURL(dataUrlToBlob(dataUrl)); } catch (e) { shareState.url = ''; }
     var img = $('shareImg');
-    img.src = url; img.alt = '修行日课 ' + cnDate(k) + ' 打卡图';
+    img.src = dataUrl;   // 预览用 data URL：微信 / iOS 长按保存最稳
+    img.alt = '修行日课 ' + cnDate(k) + ' 打卡图';
     img.setAttribute('data-day', k);
-    var dl = $('shareDownload');
-    dl.href = url; dl.download = name;
-    var wx = isWeChat(), touch = isTouch();
-    dl.hidden = wx;
+    var wx = isWeChat(), touch = isTouch() || isIOS();
+    $('shareDownload').hidden = wx;   // 微信里下载不可用，只提示长按
+    $('shareHint').classList.remove('emph');
     $('shareHint').textContent = wx ? '长按图片，选择「保存图片」或「发送给朋友」'
-      : touch ? '长按图片保存到相册，或点下面的按钮' : '点「下载图片」保存到电脑';
-    // 支持带文件分享的环境才显示「分享」
-    shareFile = null; $('shareNative').hidden = true;
-    if (navigator.canShare && window.File && cv.toBlob) {
-      cv.toBlob(function (blob) {
-        if (!blob) return;
-        try {
-          var f = new File([blob], name, { type: 'image/png' });
-          if (navigator.canShare({ files: [f] })) { shareFile = f; $('shareNative').hidden = false; }
-        } catch (e) {}
-      }, 'image/png');
-    }
+      : touch ? '长按图片保存到相册，或点「下载图片」' : '点「下载图片」保存到电脑';
     $('shareMask').hidden = false;
+  }
+  function longPressHint(msg) {
+    var h = $('shareHint');
+    h.textContent = msg; h.classList.remove('emph'); void h.offsetWidth; h.classList.add('emph');
+    toast(msg);
+  }
+  function downloadShare() {
+    var st = shareState;
+    if (!st.dataUrl) return;
+    var url = st.url || st.dataUrl;
+    var canDownload = 'download' in document.createElement('a');
+    if (isIOS() || !canDownload || !st.url) {
+      // iOS（含 iPadOS、主屏模式）不支持把图片直接下载到相册：
+      // Safari 里在新页面打开图片供长按保存；主屏模式或被拦截时，直接提示长按预览图
+      if (isIOS() && !isStandalone() && st.url) {
+        var w = null;
+        try { w = window.open(st.url, '_blank'); } catch (e) { w = null; }
+        if (w) { toast('图片已在新页面打开，长按图片选「存储到照片」'); return; }
+      }
+      longPressHint(isIOS() ? '请长按上方图片，选择「存储到照片」' : '请长按上方图片保存');
+      return;
+    }
+    var a = document.createElement('a');
+    a.href = url; a.download = st.name; a.rel = 'noopener'; a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function () { a.remove(); }, 1000);
+    toast(isTouch() ? '已开始下载；如果没反应，请长按上方图片保存' : '已开始下载，可在浏览器的下载列表里找到');
   }
   function closeShare() { $('shareMask').hidden = true; }
 
@@ -697,6 +744,8 @@
     $('confirmMask').addEventListener('click', function (e) { if (e.target === this) this.hidden = true; });
     // 看经文：按钮在 label 里，拦住点击，不触发打卡
     $('list').addEventListener('click', function (e) {
+      // 外链：放行跳转，但不让它冒泡成打卡
+      if (e.target.closest('[data-ext]')) { e.stopPropagation(); return; }
       var b = e.target.closest('[data-sutra]'); if (!b) return;
       e.preventDefault(); e.stopPropagation();
       openSutra(b.dataset.sutra);
@@ -709,10 +758,7 @@
     $('shareClose').addEventListener('click', closeShare);
     $('shareMask').addEventListener('click', function (e) { if (e.target === this) closeShare(); });
     document.addEventListener('keydown', function (e) { if (e.key === 'Escape') { closeShare(); closeSutra(); $('confirmMask').hidden = true; } });
-    $('shareNative').addEventListener('click', function () {
-      if (!shareFile) return;
-      navigator.share({ files: [shareFile], title: '修行日课' }).catch(function () {});
-    });
+    $('shareDownload').addEventListener('click', downloadShare);
 
     // 跨过 5 点自动换天：定时检查 + 回到页面时检查
     setInterval(softCheck, 15000);

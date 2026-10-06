@@ -202,3 +202,9 @@ button{font:inherit;color:inherit}
 .rm-sign{text-align:right;font-size:12.5px;color:#a8a194;margin-top:1.4em!important;letter-spacing:.1em}
 .rm-end{margin-top:1.4em!important;color:#7d766b;font-weight:400}
 .reminder + .hint{margin-top:24px}
+
+/* v1.5 外链入口（与看经文同款） */
+a.link-btn{text-decoration:none;display:inline-flex;align-items:center;gap:1px;white-space:nowrap}
+.link-btn .ext-arrow{font-size:.85em;opacity:.8;margin-left:1px}
+.share-hint.emph{color:var(--green);font-weight:600;animation:hintPulse .9s ease}
+@keyframes hintPulse{0%{transform:scale(1)}40%{transform:scale(1.04)}100%{transform:scale(1)}}

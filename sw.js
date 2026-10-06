@@ -1,19 +1,19 @@
 /* 修行日课 service worker
  * 页面（HTML）走「网络优先」，有网就拿最新版，没网才用缓存；
  * 静态资源都带 ?v= 版本号，走「缓存优先」。发新版时改下面的 VERSION 和 index.html 里的 ?v=。 */
-var VERSION = 'v7';
+var VERSION = 'v8';
 var CACHE = 'xiuxing-rike-' + VERSION;
 var ASSETS = [
   './',
   'index.html',
-  'style.css?v=7',
-  'app.js?v=7',
-  'manifest.webmanifest?v=7',
-  'icons/icon-192.png?v=7',
-  'icons/icon-512.png?v=7',
-  'icons/apple-touch-icon.png?v=7',
-  'icons/favicon-64.png?v=7',
-  'img/chanhui.jpg?v=7'
+  'style.css?v=8',
+  'app.js?v=8',
+  'manifest.webmanifest?v=8',
+  'icons/icon-192.png?v=8',
+  'icons/icon-512.png?v=8',
+  'icons/apple-touch-icon.png?v=8',
+  'icons/favicon-64.png?v=8',
+  'img/chanhui.jpg?v=8'
 ];
 
 self.addEventListener('install', function (e) {
@@ -31,6 +31,8 @@ self.addEventListener('fetch', function (e) {
   if (req.method !== 'GET') return;
   var url = new URL(req.url);
   if (url.origin !== location.origin) return;
+  // 只管本应用目录下的请求；同域其他项目（如 /huichun/）和外链一律不拦截、不缓存
+  if (url.pathname.indexOf(new URL(self.registration.scope).pathname) !== 0) return;
 
   if (req.mode === 'navigate' || req.destination === 'document') {
     e.respondWith(
