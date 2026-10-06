@@ -2,7 +2,7 @@
 (function () {
   'use strict';
 
-  var APP_VERSION = '1.7.0';
+  var APP_VERSION = '1.8.0';
 
   /* ========= 清单配置：以后增改就改这里 =========
    * 每一项要有唯一且不再改动的 id（历史记录靠 id 对应）。
@@ -14,9 +14,10 @@
       { id: 'qingli-xiangfa', title: '清理信息&关系&想法&念头' }
     ] },
     // v1.3 起去掉了独立的「断舍离」（id: duansheli）。旧日子里的记录仍留在数据里，但不再显示、不参与计数。
-    { id: 'chanhuizhou', title: '10 遍忏悔咒', scripture: 'chanhui' },
     // since：从哪一天（按 5 点分界的日期）开始生效。之前的日子没有这一项，不算进当天的完成数和全勤
-    { id: 'tianqi-juecha', title: '天气预报觉察', since: '2026-10-06' },
+    // record：这一项不能直接勾，要点「记录」写下天气 / 压力 / 能量，保存后自动完成（v1.8 起）
+    { id: 'tianqi-juecha', title: '天气预报觉察', since: '2026-10-06', record: true },
+    { id: 'chanhuizhou', title: '10 遍忏悔咒', scripture: 'chanhui' },
     { id: 'dazuo', title: '打坐🧘‍♂️' },
     { id: 'shaitaiyang', title: '晒太阳' }
   ];
@@ -25,7 +26,7 @@
   var SCRIPTURES = {
     chanhui: {
       title: '忏悔文',
-      img: 'img/chanhui.jpg?v=11',
+      img: 'img/chanhui.jpg?v=12',
       lines: ['往昔所造诸恶业', '皆由无始贪嗔痴', '从身语意之所生', '今对佛前求忏悔',
               '罪从心起将心忏', '心若灭时罪亦亡', '心灭罪亡两俱空', '是则名为真忏悔']
     }
@@ -69,6 +70,27 @@
   function weekOf(k) { return WEEK[parseKey(k).getDay()]; }
   function $(id) { return document.getElementById(id); }
   function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+
+  /* ========= 天气预报觉察（v1.8）=========
+   * 每天的记录里加一个新字段 juecha：{ weather: 文字(1～50 字), stress: 1～10, energy: 1～10, at: 最后保存的时间戳(只存不显示) }
+   * 完成与否仍看 done['tianqi-juecha']（含义不变）：保存觉察时自动写入，清除时一起删掉。 */
+  var RECORD_ID = 'tianqi-juecha';
+  var WEATHER_MAX = 50;
+  function charLen(t) { return Array.from(t).length; }
+  function cleanJuecha(j) {
+    // 校验并规整一条觉察；不合格返回 null（导入旧/坏数据时用）
+    if (!j || typeof j !== 'object') return null;
+    var w = typeof j.weather === 'string' ? j.weather.trim() : '';
+    var st = Number(j.stress), en = Number(j.energy);
+    if (!w || charLen(w) > WEATHER_MAX) return null;
+    if (!(st >= 1 && st <= 10 && st % 1 === 0) || !(en >= 1 && en <= 10 && en % 1 === 0)) return null;
+    var out = { weather: w, stress: st, energy: en };
+    var at = Number(j.at);
+    if (at && isFinite(at)) out.at = at;
+    return out;
+  }
+  function juechaOf(day) { return day ? cleanJuecha(day.juecha) : null; }
+  function juechaText(j) { return j.weather + ' · 压力 ' + j.stress + ' · 能量 ' + j.energy; }
 
   /* ========= 存储 ========= */
   var storageOk = true;
@@ -131,13 +153,14 @@
     return '<a class="sutra-btn link-btn" data-ext href="' + esc(link.href) + '"' + linkTarget() +
       ' title="' + esc(link.title || link.text) + '">' + esc(link.text) + '<span class="ext-arrow" aria-hidden="true">↗</span></a>';
   }
-  function rowHtml(id, title, isGroup, scripture, link) {
+  function rowHtml(id, title, isGroup, scripture, link, record) {
     return '<label class="row' + (isGroup ? ' group-title' : '') + '">' +
       '<input type="checkbox" ' + (isGroup ? 'data-group="' + id + '"' : 'data-id="' + id + '"') + '>' +
       '<span class="box">' + CHECK_SVG + (isGroup ? '<span class="dash"></span>' : '') + '</span>' +
       '<span class="label"><span class="tx">' + esc(title) + '</span></span>' +
       linkHtml(link) +
       (scripture && SCRIPTURES[scripture] ? '<button type="button" class="sutra-btn" data-sutra="' + scripture + '" aria-label="看' + esc(SCRIPTURES[scripture].title) + '">看经文</button>' : '') +
+      (record ? '<button type="button" class="sutra-btn record-btn" data-record="' + id + '" aria-label="记录' + esc(title) + '">记录</button>' : '') +
       (isGroup ? '<span class="count"></span>' : '') +   // v1.7 起不显示完成时间（内部仍记录时间戳）
       '</label>';
   }
@@ -146,10 +169,11 @@
     CHECKLIST.forEach(function (it) {
       if (it.children) {
         html += '<li class="group" data-gid="' + it.id + '">' + rowHtml(it.id, it.title, true) + '<ul class="sub-list">';
-        it.children.forEach(function (c) { html += '<li class="item sub" data-li="' + c.id + '">' + rowHtml(c.id, c.title, false, c.scripture, c.link) + '</li>'; });
+        it.children.forEach(function (c) { html += '<li class="item sub" data-li="' + c.id + '">' + rowHtml(c.id, c.title, false, c.scripture, c.link, c.record) + '</li>'; });
         html += '</ul></li>';
       } else {
-        html += '<li class="item" data-li="' + it.id + '">' + rowHtml(it.id, it.title, false, it.scripture, it.link) + '</li>';
+        html += '<li class="item' + (it.record ? ' has-record' : '') + '" data-li="' + it.id + '">' + rowHtml(it.id, it.title, false, it.scripture, it.link, it.record) +
+          (it.record ? '<p class="jc-sum" data-record="' + it.id + '" hidden></p>' : '') + '</li>';
       }
     });
     $('list').innerHTML = html;
@@ -163,6 +187,11 @@
       var ts = day.done[l.id];
       input.checked = !!ts;
       li.classList.toggle('done', !!ts);
+      if (l.record) {
+        var sum = li.querySelector('.jc-sum'), j = ts ? juechaOf(day) : null;
+        sum.hidden = !j;
+        sum.textContent = j ? juechaText(j) : '';   // 不显示时间
+      }
     });
     CHECKLIST.forEach(function (g) {
       if (!g.children) return;
@@ -211,6 +240,7 @@
       });
     } else {
       var id = input.dataset.id;
+      if (id === RECORD_ID) { input.checked = !!day.done[id]; openJuecha(); return; }   // 不能直接勾，只能通过「记录」完成
       if (input.checked) day.done[id] = now; else delete day.done[id];
     }
     day.updatedAt = now;
@@ -310,6 +340,7 @@
 
     renderDetail();
     renderItemStats();
+    renderTrend();
   }
 
   var SHARE_DAY_BTN = '<div class="detail-share"><button class="btn btn-small" type="button" data-share-day>保存这一天的图片</button></div>';
@@ -322,9 +353,11 @@
       (s ? '<span class="ratio">完成 ' + s.done + '/' + s.total + (s.done >= s.total ? ' · 全勤' : '') + '</span>' : '') + '</div>';
     if (!day) { $('dayDetail').innerHTML = head + '<p class="empty">这天没有打开过，没有记录。</p>' + SHARE_DAY_BTN; return; }
     var ids = leafIdsFor(k);   // 只显示那天生效的清单项
+    var jc = juechaOf(day);
     var list = ids.map(function (id) {
       var ts = day.done[id];
-      return '<li class="' + (ts ? 'ok' : 'no') + '"><span class="mk">✓</span><span>' + esc(LABELS[id] || id) + '</span>' +
+      var note = id === RECORD_ID && ts && jc ? '<span class="jc-sub">' + esc(juechaText(jc)) + '</span>' : '';
+      return '<li class="' + (ts ? 'ok' : 'no') + '"' + (id === RECORD_ID ? ' data-detail="' + id + '"' : '') + '><span class="mk">✓</span><span>' + esc(LABELS[id] || id) + note + '</span>' +
         (ts ? '' : '<span class="t">未完成</span>') + '</li>';
     }).join('');
     $('dayDetail').innerHTML = head + '<ul class="detail-list">' + list + '</ul>' +
@@ -339,6 +372,37 @@
       return '<li data-stat="' + l.id + '"><span class="nm">' + esc(l.title) + '</span><span class="tr"><i style="width:' + (n / 30 * 100) + '%"></i></span><span class="n">' + n + ' 次</span></li>';
     }).join('');
     $('itemStats').innerHTML = html;
+  }
+
+  // 近 30 天压力 / 能量：一张很简单的 SVG 折线（没记的日子断开）
+  function renderTrend() {
+    var keys = [];
+    for (var i = 29; i >= 0; i--) keys.push(addDays(currentKey, -i));
+    var pts = keys.map(function (k) { var d = data.days[k]; return d && d.done && d.done[RECORD_ID] ? juechaOf(d) : null; });
+    var n = pts.filter(Boolean).length;
+    var el = $('trend');
+    if (!n) { el.innerHTML = '<p class="empty">还没有觉察记录。每天在「天气预报觉察」点「记录」，这里会出现近 30 天的压力和能量。</p>'; return; }
+    var X0 = 26, X1 = 312, Y0 = 12, Y1 = 112;
+    var x = function (i) { return (X0 + (X1 - X0) * i / 29).toFixed(1); };
+    var y = function (v) { return (Y1 - (Y1 - Y0) * (v - 1) / 9).toFixed(1); };
+    function series(key, cls) {
+      var segs = [], cur = [], dots = '';
+      pts.forEach(function (p, i) {
+        if (p) { cur.push(x(i) + ',' + y(p[key])); dots += '<circle class="' + cls + '" cx="' + x(i) + '" cy="' + y(p[key]) + '" r="2.6"/>'; }
+        else if (cur.length) { segs.push(cur); cur = []; }
+      });
+      if (cur.length) segs.push(cur);
+      return segs.filter(function (s) { return s.length > 1; }).map(function (s) { return '<polyline class="' + cls + '" points="' + s.join(' ') + '"/>'; }).join('') + dots;
+    }
+    var grid = [1, 5, 10].map(function (v) {
+      return '<line class="g" x1="' + X0 + '" x2="' + X1 + '" y1="' + y(v) + '" y2="' + y(v) + '"/><text class="ax" x="' + (X0 - 8) + '" y="' + (+y(v) + 3.5) + '" text-anchor="end">' + v + '</text>';
+    }).join('');
+    var avg = function (key) { var t = 0; pts.forEach(function (p) { if (p) t += p[key]; }); return (t / n).toFixed(1).replace(/\.0$/, ''); };
+    el.innerHTML =
+      '<div class="trend-legend"><span class="lg stress">压力</span><span class="lg energy">能量</span><span class="avg">' + n + ' 天 · 平均压力 ' + avg('stress') + ' · 平均能量 ' + avg('energy') + '</span></div>' +
+      '<svg class="trend-svg" viewBox="0 0 320 132" role="img" aria-label="近 30 天压力和能量折线">' + grid +
+      series('stress', 'stress') + series('energy', 'energy') +
+      '<text class="ax" x="' + X0 + '" y="128">' + cnDate(keys[0]) + '</text><text class="ax" x="' + X1 + '" y="128" text-anchor="end">今天</text></svg>';
   }
 
 
@@ -443,10 +507,13 @@
         if (!doneKids.length) return;
         rows.push({ type: 'group', title: it.title, n: doneKids.length, total: it.children.length });
         doneKids.forEach(function (c) { rows.push({ type: 'sub', title: c.title, ts: done[c.id] }); });
-      } else if (done[it.id] && eff.indexOf(it.id) >= 0) rows.push({ type: 'item', title: it.title, ts: done[it.id] });
+      } else if (done[it.id] && eff.indexOf(it.id) >= 0) {
+        var jc = it.id === RECORD_ID ? juechaOf(day) : null;
+        rows.push({ type: 'item', title: it.title, ts: done[it.id], note: jc ? juechaText(jc) : '' });   // 觉察：下面附一行小字（不含时间）
+      }
     });
 
-    var W = 1080, PX = 96;
+    var W = 1080, PX = 96, NOTE_FONT = '32px ' + SANS, NOTE_LH = 46;
     var ROW = { group: 104, sub: 92, item: 108 };
     var cx0 = PX - 16, cw = W - (PX - 16) * 2;
     var cv = document.createElement('canvas'); cv.width = W; cv.height = 10;
@@ -465,6 +532,12 @@
       r.lines = wrapLines(ctx, noEmoji(r.title), (cx0 + cw - 44) - rightW - 28 - tx);
       r.lh = Math.round(r.fs * 1.32);
       r.h = ROW[r.type] + (r.lines.length - 1) * r.lh;
+      r.titleH = r.h;
+      if (r.note) {
+        ctx.font = NOTE_FONT;
+        r.noteLines = wrapLines(ctx, r.note, (cx0 + cw - 44) - tx);
+        r.h += r.noteLines.length * NOTE_LH - 6;
+      }
     });
     var listH = rows.length ? 28 + rows.reduce(function (a, r) { return a + r.h; }, 0) + 20 : 0;
     var listTop = 460;   // 日期/星期下面直接接清单（v1.6.1 去掉了大数字、进度条和那句话）
@@ -513,7 +586,7 @@
     rows.forEach(function (r, i) {
       var h = r.h, indent = r.type === 'sub' ? 64 : 0;
       var bx = r.bx, box = r.box;
-      var mid = y + h / 2;
+      var mid = y + r.titleH / 2;   // 有小字的行：勾和标题在上，小字接在下面
       var firstBase = function (off) { return mid + off - (r.lines.length - 1) * r.lh / 2; };
       var drawTitle = function (off) { r.lines.forEach(function (ln, j) { ctx.fillText(ln, bx + box + 28, firstBase(off) + j * r.lh); }); };
       if (i > 0) {
@@ -534,6 +607,11 @@
         ctx.fillStyle = r.ts ? C.ink : C.faint;
         ctx.font = r.font;
         drawTitle(15);
+        if (r.noteLines) {
+          ctx.fillStyle = C.soft; ctx.font = NOTE_FONT;
+          var nb = firstBase(15) + (r.lines.length - 1) * r.lh + 52;
+          r.noteLines.forEach(function (ln, j) { ctx.fillText(ln, bx + box + 28, nb + j * NOTE_LH); });
+        }
       }
       y += h;
     });
@@ -639,9 +717,118 @@
   }
   function closeSutra() { $('sutraMask').hidden = true; }
 
+  /* ========= 「记录」弹层：天气预报觉察 ========= */
+  var jcForm = { stress: 0, energy: 0, key: '' };
+  function scoreHtml(name) {
+    var h = '';
+    for (var i = 1; i <= 10; i++) h += '<button type="button" class="score" role="radio" aria-checked="false" data-score="' + name + '" data-v="' + i + '" aria-label="' + (name === 'stress' ? '压力 ' : '能量 ') + i + ' 分">' + i + '</button>';
+    return h;
+  }
+  function setScore(name, v) {
+    jcForm[name] = v;
+    document.querySelectorAll('[data-score="' + name + '"]').forEach(function (b) {
+      var on = +b.dataset.v === v;
+      b.classList.toggle('on', on); b.setAttribute('aria-checked', on);
+    });
+    $('jc-f-' + name).classList.remove('missing');
+    $('jcVal-' + name).textContent = v ? v + ' 分' : '';
+    if ($('jcErr').textContent) validateJuecha(true);
+  }
+  function weatherInfo() {
+    var w = $('jcWeather').value.trim();
+    var n = charLen(w);
+    $('jcCount').textContent = n + '/' + WEATHER_MAX;
+    $('jcCount').classList.toggle('over', n > WEATHER_MAX);
+    return { text: w, n: n };
+  }
+  function validateJuecha(quiet) {
+    var w = weatherInfo(), miss = [];
+    var badW = !w.n || w.n > WEATHER_MAX;
+    if (badW) miss.push('天气');
+    if (!jcForm.stress) miss.push('压力');
+    if (!jcForm.energy) miss.push('能量');
+    $('jc-f-weather').classList.toggle('missing', badW);
+    $('jc-f-stress').classList.toggle('missing', !jcForm.stress);
+    $('jc-f-energy').classList.toggle('missing', !jcForm.energy);
+    var msg = '';
+    if (miss.length) msg = w.n > WEATHER_MAX && miss.length === 1 ? '天气最多 ' + WEATHER_MAX + ' 字，现在 ' + w.n + ' 字' : '还缺：' + miss.join('、') + '（三项都要记）';
+    $('jcErr').textContent = msg;
+    if (!quiet) {
+      $('jcErr').classList.remove('emph'); void $('jcErr').offsetWidth; $('jcErr').classList.add('emph');
+    }
+    return miss.length ? null : { weather: w.text, stress: jcForm.stress, energy: jcForm.energy };
+  }
+  function openJuecha() {
+    checkRollover();
+    var day = ensureDay(currentKey);
+    var j = juechaOf(day), done = !!day.done[RECORD_ID];
+    jcForm.key = currentKey;
+    $('jcDate').textContent = cnDate(currentKey) + ' ' + weekOf(currentKey);
+    $('jcWeather').value = j ? j.weather : '';
+    $('jcErr').textContent = '';
+    ['weather', 'stress', 'energy'].forEach(function (f) { $('jc-f-' + f).classList.remove('missing'); });
+    setScore('stress', j ? j.stress : 0);
+    setScore('energy', j ? j.energy : 0);
+    weatherInfo();
+    $('jcState').textContent = done ? '今天已完成，可以查看和修改' : '三项都记下，保存后这一项自动完成';
+    $('jcSave').textContent = done ? '保存修改' : '保存';
+    $('jcClear').hidden = !(done || j);
+    $('jcConfirm').hidden = true;
+    $('jcActions').hidden = false;
+    $('jcMask').hidden = false;
+    $('jcMask').scrollTop = 0;
+    if (!j && !isTouch()) $('jcWeather').focus({ preventScroll: true });
+    else $('jcClose').focus({ preventScroll: true });
+  }
+  function closeJuecha() { $('jcMask').hidden = true; }
+  function saveJuecha() {
+    var v = validateJuecha(false);
+    if (!v) return;
+    if (checkRollover() || jcForm.key !== currentKey) { closeJuecha(); toast('已经是新的一天了，请重新记录'); return; }
+    var day = ensureDay(currentKey), now = Date.now();
+    var first = !day.done[RECORD_ID], wasEmpty = !juechaOf(day);
+    v.at = now;
+    day.juecha = v;
+    if (first) day.done[RECORD_ID] = now;   // 保存即完成；修改时保留原来的完成时间戳
+    day.updatedAt = now;
+    save();
+    closeJuecha();
+    renderToday(); renderRecords();
+    var st = streak();
+    if (first && isFull(currentKey) && st.now > 1) toast('已记录，已连续全勤 ' + st.now + ' 天');
+    else toast(first || wasEmpty ? '已记录，觉察完成' : '觉察已更新');
+  }
+  function clearJuecha() {
+    var day = ensureDay(currentKey);
+    delete day.juecha;
+    delete day.done[RECORD_ID];
+    day.updatedAt = Date.now();
+    save();
+    closeJuecha();
+    renderToday(); renderRecords();
+    toast('已清除今天的觉察');
+  }
+  function initJuecha() {
+    $('jcStress').innerHTML = scoreHtml('stress');
+    $('jcEnergy').innerHTML = scoreHtml('energy');
+    $('jcMask').addEventListener('click', function (e) {
+      if (e.target === this || e.target.classList.contains('jc-scroll')) { closeJuecha(); return; }
+      var b = e.target.closest('[data-score]');
+      if (b) setScore(b.dataset.score, +b.dataset.v);
+    });
+    $('jcWeather').addEventListener('input', function () { weatherInfo(); if ($('jcErr').textContent) validateJuecha(true); });
+    $('jcForm').addEventListener('submit', function (e) { e.preventDefault(); saveJuecha(); });
+    $('jcClose').addEventListener('click', closeJuecha);
+    $('jcCancel').addEventListener('click', closeJuecha);
+    $('jcClear').addEventListener('click', function () { $('jcActions').hidden = true; $('jcConfirm').hidden = false; $('jcConfirmNo').focus({ preventScroll: true }); });
+    $('jcConfirmNo').addEventListener('click', function () { $('jcConfirm').hidden = true; $('jcActions').hidden = false; });
+    $('jcConfirmYes').addEventListener('click', clearJuecha);
+  }
+
   /* ========= 导出 / 导入 / 清空 ========= */
   function exportData() {
-    var out = { app: 'xiuxing-rike', version: 1, exportedAt: new Date().toISOString(), dayStartHour: DAY_START_HOUR,
+    // days 里每天的 juecha（天气 / 压力 / 能量）原样导出
+    var out = { app: 'xiuxing-rike', version: 1, appVersion: APP_VERSION, exportedAt: new Date().toISOString(), dayStartHour: DAY_START_HOUR,
       checklist: CHECKLIST, days: data.days };
     var blob = new Blob([JSON.stringify(out, null, 2)], { type: 'application/json' });
     var a = document.createElement('a');
@@ -668,6 +855,9 @@
         if (!dst.done[id] || ts < dst.done[id]) dst.done[id] = ts;   // 合并：保留更早的完成时间
       });
       if (Array.isArray(src.items)) src.items.forEach(function (id) { if (dst.items.indexOf(id) < 0) dst.items.push(id); });
+      // 觉察内容（v1.8 新字段，旧备份没有就跳过）：本机没有就用备份的；两边都有时保留最后保存的那份
+      var sj = cleanJuecha(src.juecha), dj = cleanJuecha(dst.juecha);
+      if (sj && (!dj || (sj.at || 0) > (dj.at || 0))) dst.juecha = sj;
       n++;
     });
     save();
@@ -712,6 +902,7 @@
     renderToday();
     renderRecords();
 
+    initJuecha();
     $('list').addEventListener('change', onListChange);
     document.querySelectorAll('.tab').forEach(function (b) { b.addEventListener('click', function () { switchView(b.dataset.view); }); });
     $('calGrid').addEventListener('click', function (e) {
@@ -737,6 +928,9 @@
     $('list').addEventListener('click', function (e) {
       // 外链：放行跳转，但不让它冒泡成打卡
       if (e.target.closest('[data-ext]')) { e.stopPropagation(); return; }
+      // 天气预报觉察：整行（勾选框、项名、「记录」、下面的小字）都打开记录弹层，不直接勾选
+      var rec = e.target.closest('[data-record]') || e.target.closest('[data-li="' + RECORD_ID + '"] > label.row');
+      if (rec) { e.preventDefault(); e.stopPropagation(); openJuecha(); return; }
       var b = e.target.closest('[data-sutra]'); if (!b) return;
       e.preventDefault(); e.stopPropagation();
       openSutra(b.dataset.sutra);
@@ -748,7 +942,7 @@
     $('dayDetail').addEventListener('click', function (e) { if (e.target.closest('[data-share-day]')) openShare(selectedKey); });
     $('shareClose').addEventListener('click', closeShare);
     $('shareMask').addEventListener('click', function (e) { if (e.target === this) closeShare(); });
-    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') { closeShare(); closeSutra(); $('confirmMask').hidden = true; } });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') { closeShare(); closeSutra(); closeJuecha(); $('confirmMask').hidden = true; } });
     $('shareDownload').addEventListener('click', downloadShare);
 
     // 跨过 5 点自动换天：定时检查 + 回到页面时检查
@@ -768,7 +962,7 @@
   }
 
   // 给测试和调试用的只读入口
-  window.__rike = { todayKey: todayKey, drawShare: function (k) { return drawShare(k).toDataURL('image/png'); }, data: function () { return data; }, importText: importText, version: APP_VERSION };
+  window.__rike = { todayKey: todayKey, drawShare: function (k) { return drawShare(k).toDataURL('image/png'); }, data: function () { return data; }, importText: importText, version: APP_VERSION, openJuecha: openJuecha };
 
   init();
 })();

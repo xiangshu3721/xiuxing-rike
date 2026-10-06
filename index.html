@@ -10,16 +10,16 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="修行日课">
-<link rel="manifest" href="manifest.webmanifest?v=11">
-<link rel="icon" type="image/png" sizes="64x64" href="icons/favicon-64.png?v=11">
-<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=11">
-<link rel="stylesheet" href="style.css?v=11">
+<link rel="manifest" href="manifest.webmanifest?v=12">
+<link rel="icon" type="image/png" sizes="64x64" href="icons/favicon-64.png?v=12">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=12">
+<link rel="stylesheet" href="style.css?v=12">
 </head>
 <body>
 <div class="app">
   <header class="top">
     <div class="brand">
-      <img class="logo" src="icons/icon-192.png?v=11" alt="" width="40" height="40">
+      <img class="logo" src="icons/icon-192.png?v=12" alt="" width="40" height="40">
       <div class="brand-text">
         <h1>修行日课</h1>
         <p class="sub">每天一点功课，慢慢来</p>
@@ -98,6 +98,11 @@
         <ul id="itemStats" class="item-stats"></ul>
       </div>
 
+      <div class="card trend-card">
+        <h2 class="card-title">近 30 天压力和能量</h2>
+        <div id="trend"></div>
+      </div>
+
       <div class="card data-card">
         <h2 class="card-title">数据备份</h2>
         <p class="muted">记录只存在这台设备的浏览器里。换手机、清缓存之前，先导出一份。</p>
@@ -141,6 +146,55 @@
   </div>
 </div>
 
+<div id="jcMask" class="mask jc-mask" hidden>
+  <div class="jc-scroll">
+    <form id="jcForm" class="jc-dialog" role="dialog" aria-modal="true" aria-labelledby="jcTitle" novalidate autocomplete="off">
+      <div class="jc-head">
+        <div>
+          <h3 id="jcTitle">天气预报觉察</h3>
+          <p id="jcDate" class="jc-date"></p>
+        </div>
+        <button id="jcClose" class="icon-btn" type="button" aria-label="关闭">×</button>
+      </div>
+      <p id="jcState" class="jc-state"></p>
+
+      <div id="jc-f-weather" class="jc-field">
+        <div class="jc-label"><label for="jcWeather">天气</label><span id="jcCount" class="jc-count">0/50</span></div>
+        <input id="jcWeather" class="jc-input" type="text" inputmode="text" enterkeyhint="done" placeholder="比如：晴，微风，有点闷" aria-describedby="jcErr">
+      </div>
+
+      <div id="jc-f-stress" class="jc-field">
+        <div class="jc-label"><span id="jcStressLb">压力</span><span id="jcVal-stress" class="jc-val"></span></div>
+        <div id="jcStress" class="scores" role="radiogroup" aria-labelledby="jcStressLb"></div>
+        <div class="scale"><span>1 很轻松</span><span>10 压力很大</span></div>
+      </div>
+
+      <div id="jc-f-energy" class="jc-field">
+        <div class="jc-label"><span id="jcEnergyLb">能量</span><span id="jcVal-energy" class="jc-val"></span></div>
+        <div id="jcEnergy" class="scores" role="radiogroup" aria-labelledby="jcEnergyLb"></div>
+        <div class="scale"><span>1 很疲惫</span><span>10 很充沛</span></div>
+      </div>
+
+      <p id="jcErr" class="jc-err" role="alert" aria-live="assertive"></p>
+
+      <div id="jcActions" class="jc-actions">
+        <button id="jcClear" class="jc-clear" type="button">清除今天的觉察</button>
+        <div class="btn-row end">
+          <button id="jcCancel" class="btn" type="button">取消</button>
+          <button id="jcSave" class="btn btn-primary" type="submit">保存</button>
+        </div>
+      </div>
+      <div id="jcConfirm" class="jc-confirm" hidden>
+        <p>确定清除今天的觉察？天气、压力、能量都会删掉，这一项变回未完成。</p>
+        <div class="btn-row end">
+          <button id="jcConfirmNo" class="btn" type="button">先不了</button>
+          <button id="jcConfirmYes" class="btn btn-danger-solid" type="button">确认清除</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
 <div id="shareMask" class="mask share-mask" hidden>
   <div class="share-dialog" role="dialog" aria-modal="true" aria-label="分享图片预览">
     <div class="share-img-wrap"><img id="shareImg" alt="打卡分享图"></div>
@@ -152,6 +206,6 @@
   </div>
 </div>
 
-<script src="app.js?v=11"></script>
+<script src="app.js?v=12"></script>
 </body>
 </html>
