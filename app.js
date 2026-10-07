@@ -2,13 +2,14 @@
 (function () {
   'use strict';
 
-  var APP_VERSION = '1.10.0';
+  var APP_VERSION = '1.11.0';
 
   /* ========= 清单配置：以后增改就改这里 =========
    * 每一项要有唯一且不再改动的 id（历史记录靠 id 对应）。
    * 带 children 的是一组，组本身不计数，只算子项。          */
   var CHECKLIST = [
-    { id: 'sanqingli', title: '三清理断舍离', children: [
+    // info：分组标题右侧出现「查看」，点开看说明（见下面 INFOS；v1.11 起）
+    { id: 'sanqingli', title: '三清理断舍离', info: 'sanqingli', children: [
       { id: 'qingli-huanjing', title: '清理环境' },
       { id: 'qingli-shenti', title: '清理身体和情绪', link: { text: '回春叩问', href: 'https://xiangshu3721.github.io/huichun/', title: '打开《回春明点叩问》' } },
       { id: 'qingli-xiangfa', title: '清理信息&关系&想法&念头' }
@@ -27,9 +28,21 @@
   var SCRIPTURES = {
     chanhui: {
       title: '忏悔文',
-      img: 'img/chanhui.jpg?v=16',
+      img: 'img/chanhui.jpg?v=17',
       lines: ['往昔所造诸恶业', '皆由无始贪嗔痴', '从身语意之所生', '今对佛前求忏悔',
               '罪从心起将心忏', '心若灭时罪亦亡', '心灭罪亡两俱空', '是则名为真忏悔']
+    }
+  };
+
+  /* 说明：清单项 / 分组里写 info: 'xxx'，右侧出现「查看」，弹层显示下面的文字（逐字照用户原文，不加不改）。
+     每段是若干行 [强调词, 后半句]，显示成「强调词：后半句」 */
+  var INFOS = {
+    sanqingli: {
+      title: '三清理断舍离',
+      sections: [
+        [['断', '断掉无益之烦恼'], ['舍', '放舍执念与妄念'], ['离', '远离负能量']],
+        [['早上', '清理周围环境和能量场'], ['下午', '清理自己和自己物品'], ['晚上', '清理内心']]
+      ]
     }
   };
 
@@ -166,7 +179,7 @@
     return '<a class="sutra-btn link-btn" data-ext href="' + esc(link.href) + '"' + linkTarget() +
       ' title="' + esc(link.title || link.text) + '">' + esc(link.text) + '<span class="ext-arrow" aria-hidden="true">↗</span></a>';
   }
-  function rowHtml(id, title, isGroup, scripture, link, record) {
+  function rowHtml(id, title, isGroup, scripture, link, record, info) {
     return '<label class="row' + (isGroup ? ' group-title' : '') + '">' +
       '<input type="checkbox" ' + (isGroup ? 'data-group="' + id + '"' : 'data-id="' + id + '"') + '>' +
       '<span class="box">' + CHECK_SVG + (isGroup ? '<span class="dash"></span>' : '') + '</span>' +
@@ -174,6 +187,7 @@
       linkHtml(link) +
       (scripture && SCRIPTURES[scripture] ? '<button type="button" class="sutra-btn" data-sutra="' + scripture + '" aria-label="看' + esc(SCRIPTURES[scripture].title) + '">看经文</button>' : '') +
       (record ? '<button type="button" class="sutra-btn record-btn" data-record="' + id + '" aria-label="记录' + esc(title) + '">记录</button>' : '') +
+      (info && INFOS[info] ? '<button type="button" class="sutra-btn view-btn" data-info="' + info + '" aria-label="查看' + esc(INFOS[info].title) + '说明">查看</button>' : '') +
       (isGroup ? '<span class="count"></span>' : '') +   // v1.7 起不显示完成时间（内部仍记录时间戳）
       '</label>';
   }
@@ -181,7 +195,7 @@
     var html = '';
     CHECKLIST.forEach(function (it) {
       if (it.children) {
-        html += '<li class="group" data-gid="' + it.id + '">' + rowHtml(it.id, it.title, true) + '<ul class="sub-list">';
+        html += '<li class="group" data-gid="' + it.id + '">' + rowHtml(it.id, it.title, true, null, null, null, it.info) + '<ul class="sub-list">';
         it.children.forEach(function (c) { html += '<li class="item sub" data-li="' + c.id + '">' + rowHtml(c.id, c.title, false, c.scripture, c.link, c.record) + '</li>'; });
         html += '</ul></li>';
       } else {
@@ -903,6 +917,7 @@
   /* ========= 经文弹层 ========= */
   function openSutra(key) {
     var sc = SCRIPTURES[key]; if (!sc) return;
+    $('sutraMask').classList.remove('info-mode');
     $('sutraTitle').textContent = sc.title;
     var img = $('sutraImg');
     img.alt = sc.title + '（手写经文图）';
@@ -913,6 +928,20 @@
     $('sutraClose').focus({ preventScroll: true });
   }
   function closeSutra() { $('sutraMask').hidden = true; }
+  // 「查看」说明：复用经文弹层（不显示图片），强调词稍大、墨绿
+  function openInfo(key) {
+    var inf = INFOS[key]; if (!inf) return;
+    $('sutraMask').classList.add('info-mode');
+    $('sutraTitle').textContent = inf.title;
+    $('sutraText').innerHTML = inf.sections.map(function (sec) {
+      return '<div class="info-sec">' + sec.map(function (l) {
+        return '<p><b class="info-k' + (l[0].length === 1 ? ' one' : '') + '">' + esc(l[0]) + '</b>：' + esc(l[1]) + '</p>';
+      }).join('') + '</div>';
+    }).join('');
+    $('sutraMask').hidden = false;
+    $('sutraMask').scrollTop = 0;
+    $('sutraClose').focus({ preventScroll: true });
+  }
 
   /* ========= 「记录」弹层：天气预报觉察 ========= */
   var jcForm = { stress: 0, energy: 0, key: '' };
@@ -1161,6 +1190,8 @@
       // 天气预报觉察：整行（勾选框、项名、「记录」、下面的小字）都打开记录弹层，不直接勾选
       var rec = e.target.closest('[data-record]') || e.target.closest('[data-li="' + RECORD_ID + '"] > label.row');
       if (rec) { e.preventDefault(); e.stopPropagation(); openJuecha(); return; }
+      var inf = e.target.closest('[data-info]');
+      if (inf) { e.preventDefault(); e.stopPropagation(); openInfo(inf.dataset.info); return; }   // 不触发分组全勾
       var b = e.target.closest('[data-sutra]'); if (!b) return;
       e.preventDefault(); e.stopPropagation();
       openSutra(b.dataset.sutra);
