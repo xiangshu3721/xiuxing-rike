@@ -10,9 +10,10 @@
   var CHECKLIST = [
     // info：分组标题右侧出现「查看」，点开看说明（见下面 INFOS；v1.11 起）
     { id: 'sanqingli', title: '三清理断舍离', info: 'sanqingli', children: [
-      { id: 'qingli-huanjing', title: '清理环境' },
-      { id: 'qingli-shenti', title: '清理身体和情绪', link: { text: '回春叩问', href: 'https://xiangshu3721.github.io/huichun/', title: '打开《回春明点叩问》' } },
-      { id: 'qingli-xiangfa', title: '清理信息&关系&想法&念头' }
+      // v1.11 起只改了显示名称，id 不变（历史数据、连续天数照旧）；「回春叩问」从 qingli-shenti 移到 qingli-xiangfa
+      { id: 'qingli-huanjing', title: '清理周围环境和能量场' },
+      { id: 'qingli-shenti', title: '清理身体和自己物品、信息' },
+      { id: 'qingli-xiangfa', title: '清理内心和情绪', link: { text: '回春叩问', href: 'https://xiangshu3721.github.io/huichun/', title: '打开《回春明点叩问》' } }
     ] },
     // v1.3 起去掉了独立的「断舍离」（id: duansheli）。旧日子里的记录仍留在数据里，但不再显示、不参与计数。
     // since：从哪一天（按 5 点分界的日期）开始生效。之前的日子没有这一项，不算进当天的完成数和全勤
@@ -28,7 +29,7 @@
   var SCRIPTURES = {
     chanhui: {
       title: '忏悔文',
-      img: 'img/chanhui.jpg?v=17',
+      img: 'img/chanhui.jpg?v=18',
       lines: ['往昔所造诸恶业', '皆由无始贪嗔痴', '从身语意之所生', '今对佛前求忏悔',
               '罪从心起将心忏', '心若灭时罪亦亡', '心灭罪亡两俱空', '是则名为真忏悔']
     }
