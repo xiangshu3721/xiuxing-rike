@@ -10,16 +10,16 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="修行日课">
-<link rel="manifest" href="manifest.webmanifest?v=18">
-<link rel="icon" type="image/png" sizes="64x64" href="icons/favicon-64.png?v=18">
-<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=18">
-<link rel="stylesheet" href="style.css?v=18">
+<link rel="manifest" href="manifest.webmanifest?v=19">
+<link rel="icon" type="image/png" sizes="64x64" href="icons/favicon-64.png?v=19">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=19">
+<link rel="stylesheet" href="style.css?v=19">
 </head>
 <body>
 <div class="app">
   <header class="top">
     <div class="brand">
-      <img class="logo" src="icons/icon-192.png?v=18" alt="" width="40" height="40">
+      <img class="logo" src="icons/icon-192.png?v=19" alt="" width="40" height="40">
       <div class="brand-text">
         <h1>修行日课</h1>
         <p class="sub">每天一点功课，慢慢来</p>
@@ -54,6 +54,7 @@
         <p id="cheer" class="cheer" hidden></p>
       </div>
       <ul id="list" class="list"></ul>
+      <div class="manage-row"><button id="manageBtn" class="sutra-btn manage-btn" type="button" aria-haspopup="dialog"><span class="pl" aria-hidden="true">＋</span>管理任务</button></div>
       <aside class="reminder" aria-label="提醒">
         <div class="rm-stanza">
           <p>旧的关系，</p>
@@ -138,6 +139,29 @@
       <button id="confirmNo" class="btn">先不了</button>
       <button id="confirmYes" class="btn btn-danger-solid">确认清空</button>
     </div>
+  </div>
+</div>
+
+<div id="tkMask" class="mask tk-mask" hidden>
+  <div class="dialog tk-dialog" role="dialog" aria-modal="true" aria-labelledby="tkTitle">
+    <div class="tk-head">
+      <h3 id="tkTitle">管理任务</h3>
+      <button id="tkClose" class="icon-btn" type="button" aria-label="关闭">×</button>
+    </div>
+    <div id="tkBody" class="tk-body">
+      <p class="tk-sec">默认任务<small>固定在前面，不能改</small></p>
+      <ul id="tkFixed" class="tk-fixed"></ul>
+      <p class="tk-sec">自定义任务<small id="tkCount"></small></p>
+      <ul id="tkList" class="tk-list"></ul>
+    </div>
+    <form id="tkAdd" class="tk-add" novalidate autocomplete="off">
+      <div class="tk-add-row">
+        <input id="tkNew" class="jc-input" type="text" maxlength="40" enterkeyhint="done" aria-label="新任务名称" placeholder="新任务，如：读书 20 分钟">
+        <button id="tkAddBtn" class="btn btn-primary" type="submit">添加</button>
+      </div>
+      <p id="tkErr" class="jc-err" role="alert"></p>
+      <p class="tk-note">名称 1～20 个字，不能和已有任务重名。新任务从今天起算；删除后从今天起不再计入，以前的打卡记录都保留。</p>
+    </form>
   </div>
 </div>
 
@@ -237,6 +261,6 @@
   </div>
 </div>
 
-<script src="app.js?v=18"></script>
+<script src="app.js?v=19"></script>
 </body>
 </html>

@@ -2,11 +2,12 @@
 (function () {
   'use strict';
 
-  var APP_VERSION = '1.11.0';
+  var APP_VERSION = '1.12.0';
 
   /* ========= 清单配置：以后增改就改这里 =========
    * 每一项要有唯一且不再改动的 id（历史记录靠 id 对应）。
-   * 带 children 的是一组，组本身不计数，只算子项。          */
+   * 带 children 的是一组，组本身不计数，只算子项。
+   * v1.12 起这里只放「固定项」（不能删、不能改名、固定在最前面）；后面的是用户的自定义任务（见 DEFAULT_TASKS / data.tasks）。 */
   var CHECKLIST = [
     // info：分组标题右侧出现「查看」，点开看说明（见下面 INFOS；v1.11 起）
     { id: 'sanqingli', title: '三清理断舍离', info: 'sanqingli', children: [
@@ -19,17 +20,23 @@
     // since：从哪一天（按 5 点分界的日期）开始生效。之前的日子没有这一项，不算进当天的完成数和全勤
     // record：这一项不能直接勾，要点「记录」写下天气 / 压力 / 能量，保存后自动完成（v1.8 起）
     { id: 'tianqi-juecha', title: '天气预报觉察', since: '2026-10-06', record: true },
-    { id: 'chanhuizhou', title: '10 遍忏悔咒', scripture: 'chanhui' },
-    // icon：名字旁的小图标（自绘线条 SVG，见下面 ICONS；v1.0 起名字里是 🧘‍♂️ emoji，分享图一直把 emoji 去掉了，v1.9.1 改成自绘图标三处一致）
-    { id: 'dazuo', title: '打坐', icon: 'dazuo' },
-    { id: 'shaitaiyang', title: '晒太阳' }
+    { id: 'chanhuizhou', title: '10 遍忏悔咒', scripture: 'chanhui' }
   ];
+  /* 自定义任务（v1.12）：存在 data.tasks 里，[{ id, title, since?, until?, at? }]，数组顺序就是显示顺序。
+   * - 旧用户第一次打开时自动迁移成下面两项（id 不变，历史打卡、连续天数照旧）。
+   * - 新增：id = custom-时间戳，since = 添加那天，之前的日子不算这一项。
+   * - 删除：不真删，记 until = 删除那天，从那天起不再计入；之前的日子仍按当时清单算全勤、连续天数、历史详情、分享图。
+   * - 改名：只改 title，id 不变。
+   * - 图标：名字里有「打坐」的任务旁边画打坐小人（自绘 SVG，见 ICONS；v1.0～v1.9.0 是 🧘‍♂️ emoji，v1.9.1 起自绘三处一致）。 */
+  var DEFAULT_TASKS = [{ id: 'dazuo', title: '打坐' }, { id: 'shaitaiyang', title: '晒太阳' }];
+  var TASK_MAX = 20;      // 名称最多 20 个字
+  var TASK_LIMIT = 20;    // 自定义任务最多 20 个
 
   /* 经文：清单项里写 scripture: 'xxx' 就会在那一项旁边出现「看经文」 */
   var SCRIPTURES = {
     chanhui: {
       title: '忏悔文',
-      img: 'img/chanhui.jpg?v=18',
+      img: 'img/chanhui.jpg?v=19',
       lines: ['往昔所造诸恶业', '皆由无始贪嗔痴', '从身语意之所生', '今对佛前求忏悔',
               '罪从心起将心忏', '心若灭时罪亦亡', '心灭罪亡两俱空', '是则名为真忏悔']
     }
@@ -71,20 +78,43 @@
   }
 
   /* ========= 工具 ========= */
-  var LEAVES = [];   // 可勾项（目前 7 个）
-  var LABELS = {}, ICON_OF = {};
+  var FIXED_LEAVES = [];   // 固定的可勾项（三清理 3 项 + 天气预报觉察 + 忏悔咒）
+  var LABELS = {}, ICON_OF = {}, FIXED_IDS = {}, FIXED_TITLES = [];
   CHECKLIST.forEach(function (it) {
-    if (it.children) it.children.forEach(function (c) { LEAVES.push(c); LABELS[c.id] = c.title; if (c.icon) ICON_OF[c.id] = c.icon; });
-    else { LEAVES.push(it); LABELS[it.id] = it.title; if (it.icon) ICON_OF[it.id] = it.icon; }
+    FIXED_IDS[it.id] = 1; FIXED_TITLES.push(it.title);
+    (it.children || [it]).forEach(function (c) {
+      if (c !== it) { FIXED_IDS[c.id] = 1; FIXED_TITLES.push(c.title); }
+      FIXED_LEAVES.push(c); LABELS[c.id] = c.title; if (c.icon) ICON_OF[c.id] = c.icon;
+    });
   });
-  var LEAF_IDS = LEAVES.map(function (l) { return l.id; });
-  var CN_NUM = ['零', '一', '两', '三', '四', '五', '六', '七', '八', '九', '十', '十一', '十二'];
-  // 某一天生效的清单：去掉的项不算；带 since 的项只从那天起算
-  function leavesFor(k) { return LEAVES.filter(function (l) { return !l.since || k >= l.since; }); }
+  var tasks = [];   // = data.tasks（含已删除的，删除的带 until）
+  function taskIcon(title) { return title.indexOf(ICONS.dazuo.label) >= 0 ? 'dazuo' : ''; }
+  function taskLive(t, k) { return (!t.since || k >= t.since) && (!t.until || k < t.until); }
+  function taskLeaf(t) { return { id: t.id, title: t.title, icon: taskIcon(t.title), custom: true }; }
+  function activeTasks() { return tasks.filter(function (t) { return !t.until || t.until > currentKey; }); }   // 没删除的（管理弹层里列的）
+  function refreshLabels() {
+    tasks.forEach(function (t) { LABELS[t.id] = t.title; var ic = taskIcon(t.title); if (ic) ICON_OF[t.id] = ic; else delete ICON_OF[t.id]; });
+  }
+  // 某一天生效的清单：固定项（带 since 的只从那天起算）+ 当天有效的自定义任务（since ≤ 那天 < until）
+  function leavesFor(k) {
+    return FIXED_LEAVES.filter(function (l) { return !l.since || k >= l.since; })
+      .concat(tasks.filter(function (t) { return taskLive(t, k); }).map(taskLeaf));
+  }
   function leafIdsFor(k) { return leavesFor(k).map(function (l) { return l.id; }); }
+  // 中文数字：0～99（2 用「两」，如「两项圆满」）
+  function cnNum(n) {
+    var D = ['零', '一', '二', '三', '四', '五', '六', '七', '八', '九'];
+    if (n === 2) return '两';
+    if (n < 0 || n > 99 || n % 1) return String(n);
+    if (n < 10) return D[n];
+    var t = Math.floor(n / 10), o = n % 10;
+    return (t === 1 ? '' : D[t]) + '十' + (o ? D[o] : '');
+  }
   function cheerFor(k) {
     var n = leafIdsFor(k).length;
-    return CHEERS[parseKey(k).getDate() % CHEERS.length].replace('{N}', CN_NUM[n] || String(n));
+    var line = CHEERS[parseKey(k).getDate() % CHEERS.length];
+    if (line.indexOf('{N}') >= 0 && n <= 0) line = CHEERS[0];   // 0 项的边界：不说「零项圆满」
+    return line.replace('{N}', cnNum(n));
   }
 
   function pad(n) { return (n < 10 ? '0' : '') + n; }
@@ -145,14 +175,41 @@
   var data = load();
   var currentKey = todayKey();
 
+  /* ========= 自定义任务：规整 / 迁移 ========= */
+  var KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
+  function normTasks(arr) {
+    var seen = {}, out = [];
+    (Array.isArray(arr) ? arr : []).forEach(function (t) {
+      if (!t || typeof t !== 'object' || typeof t.id !== 'string' || !/^[A-Za-z0-9_-]{1,48}$/.test(t.id)) return;
+      if (FIXED_IDS[t.id] || seen[t.id]) return;   // 固定项不能出现在自定义里
+      var title = typeof t.title === 'string' ? t.title.trim() : '';
+      if (!title) return;
+      if (charLen(title) > TASK_MAX) title = Array.from(title).slice(0, TASK_MAX).join('');
+      var o = { id: t.id, title: title };
+      if (KEY_RE.test(t.since || '')) o.since = t.since;
+      if (KEY_RE.test(t.until || '')) o.until = t.until;
+      var at = Number(t.at); if (at && isFinite(at)) o.at = at;
+      seen[t.id] = 1; out.push(o);
+    });
+    return out;
+  }
+  function ensureTasks() {
+    // 旧数据没有 tasks 字段：迁移成默认的 [打坐, 晒太阳]（id 不变）
+    if (!Array.isArray(data.tasks)) data.tasks = DEFAULT_TASKS.map(function (t) { return { id: t.id, title: t.title }; });
+    data.tasks = normTasks(data.tasks);
+    tasks = data.tasks;
+    refreshLabels();
+  }
+  ensureTasks();
+
   function ensureDay(k) {
-    if (!data.days[k]) data.days[k] = { items: LEAF_IDS.slice(), done: {} };
+    if (!data.days[k]) data.days[k] = { items: leafIdsFor(k), done: {} };
     var day = data.days[k];
     if (!day.done) day.done = {};
-    if (!day.items) day.items = LEAF_IDS.slice();
+    if (!day.items) day.items = leafIdsFor(k);
     if (k === currentKey) {
-      // 今天：清单以当前配置为准（以后增改清单当天就生效）
-      day.items = LEAF_IDS.slice();
+      // 今天：清单以当前配置为准（增删自定义任务当天就生效）
+      day.items = leafIdsFor(k);
     }
     return day;
   }
@@ -204,13 +261,19 @@
           (it.record ? '<p class="jc-sum" data-record="' + it.id + '" hidden></p>' : '') + '</li>';
       }
     });
+    // 自定义任务排在固定项后面
+    leavesFor(currentKey).filter(function (l) { return l.custom; }).forEach(function (l) {
+      html += '<li class="item custom" data-li="' + l.id + '">' + rowHtml(l.id, l.title, false) + '</li>';
+    });
     $('list').innerHTML = html;
+    $('ruleCount').textContent = leafIdsFor(currentKey).length;
   }
 
   function renderToday() {
     var day = ensureDay(currentKey);
-    LEAVES.forEach(function (l) {
+    leavesFor(currentKey).forEach(function (l) {
       var li = document.querySelector('[data-li="' + l.id + '"]');
+      if (!li) { buildList(); li = document.querySelector('[data-li="' + l.id + '"]'); }
       var input = li.querySelector('input');
       var ts = day.done[l.id];
       input.checked = !!ts;
@@ -286,6 +349,7 @@
     var k = todayKey();
     if (k === currentKey) return false;
     currentKey = k;
+    buildList();
     ensureDay(currentKey);
     save();
     selectedKey = currentKey;
@@ -485,7 +549,7 @@
   function renderItemStats() {
     var keys = [];
     for (var i = 0; i < 30; i++) keys.push(addDays(currentKey, -i));
-    var html = LEAVES.map(function (l) {
+    var html = leavesFor(currentKey).map(function (l) {
       var n = keys.filter(function (k) { var d = data.days[k]; return d && d.done && d.done[l.id]; }).length;
       return '<li data-stat="' + l.id + '"><span class="nm">' + esc(l.title) + iconSvg(l.icon) + '</span><span class="tr"><i style="width:' + (n / 30 * 100) + '%"></i></span><span class="n">' + n + ' 次</span></li>';
     }).join('');
@@ -691,7 +755,7 @@
   function drawShare(k, forceStamp) {
     lastStamp = null;
     shareIcons = [];
-    var day = data.days[k] || { items: LEAF_IDS.slice(), done: {} };
+    var day = data.days[k] || { items: leafIdsFor(k), done: {} };
     var done = day.done || {};
     var s = dayStat(k) || { done: 0, total: leafIdsFor(k).length, ratio: 0 };
     var eff = leafIdsFor(k);
@@ -701,7 +765,8 @@
 
     // 行：只画已完成的项（按当前清单结构，组里有完成的子项才画组标题）；没完成的、已从清单去掉的都不画
     var rows = [];
-    CHECKLIST.forEach(function (it) {
+    // 固定项 + 那天有效的自定义任务（删除前的日子仍画当时的任务）
+    CHECKLIST.concat(leavesFor(k).filter(function (l) { return l.custom; })).forEach(function (it) {
       if (it.children) {
         var doneKids = it.children.filter(function (c) { return done[c.id] && eff.indexOf(c.id) >= 0; });
         if (!doneKids.length) return;
@@ -1086,11 +1151,161 @@
     $('jcConfirmYes').addEventListener('click', clearJuecha);
   }
 
+  /* ========= 管理任务（v1.12）：自定义任务的新增 / 改名 / 删除 / 排序 ========= */
+  var tkEdit = null, tkAsk = null;   // 正在改名 / 正在确认删除的任务 id
+  var LOCK_SVG = '<svg class="tk-lock" viewBox="0 0 16 16" aria-hidden="true"><rect x="3.2" y="7" width="9.6" height="6.8" rx="1.6"/><path d="M5.4 7V5.2a2.6 2.6 0 0 1 5.2 0V7"/></svg>';
+  var CHEV = { up: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 10.2 8 5.8l4.5 4.4"/></svg>', down: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 5.8 8 10.2l4.5-4.4"/></svg>' };
+  function checkTitle(raw, selfId) {
+    var t = String(raw == null ? '' : raw).trim();
+    if (!t) return { err: '请输入任务名称' };
+    var n = charLen(t);
+    if (n > TASK_MAX) return { err: '名称最多 ' + TASK_MAX + ' 个字（现在 ' + n + ' 个字）' };
+    var low = t.toLowerCase();
+    var names = FIXED_TITLES.concat(activeTasks().filter(function (x) { return x.id !== selfId; }).map(function (x) { return x.title; }));
+    var clash = names.filter(function (x) { return x.toLowerCase() === low; })[0];
+    if (clash) return { err: '已经有「' + clash + '」了，换个名字吧' };
+    return { title: t };
+  }
+  function tasksChanged() {
+    refreshLabels();
+    ensureDay(currentKey);   // 今天的 items 跟着变
+    save();
+    buildList(); renderToday(); renderRecords(); renderManage();
+  }
+  function addTask(raw) {
+    checkRollover();
+    if (activeTasks().length >= TASK_LIMIT) return { err: '自定义任务最多 ' + TASK_LIMIT + ' 个' };
+    var c = checkTitle(raw); if (c.err) return c;
+    var now = Date.now(), id = 'custom-' + now;
+    while (tasks.some(function (t) { return t.id === id; })) id = 'custom-' + (++now);
+    tasks.push({ id: id, title: c.title, since: currentKey, at: Date.now() });
+    tasksChanged();
+    return { id: id, title: c.title };
+  }
+  function renameTask(id, raw) {
+    var t = tasks.filter(function (x) { return x.id === id; })[0]; if (!t) return { err: '找不到这个任务' };
+    var c = checkTitle(raw, id); if (c.err) return c;
+    if (c.title !== t.title) { t.title = c.title; t.at = Date.now(); }
+    tkEdit = null;
+    tasksChanged();
+    return c;
+  }
+  function deleteTask(id) {
+    checkRollover();
+    var t = tasks.filter(function (x) { return x.id === id; })[0]; if (!t) return;
+    t.until = currentKey; t.at = Date.now();   // 不删历史：从今天起不再计入
+    if (t.since && t.since >= t.until) tasks.splice(tasks.indexOf(t), 1);   // 今天才加今天就删：从没生效过，直接拿掉（打卡数据仍留着）
+    tkAsk = null;
+    tasksChanged();
+    toast('已删除「' + t.title + '」，以前的打卡记录都还在');
+  }
+  function moveTask(id, dir) {
+    var act = activeTasks(), i = act.map(function (t) { return t.id; }).indexOf(id), j = i + dir;
+    if (i < 0 || j < 0 || j >= act.length) return;
+    var a = tasks.indexOf(act[i]), b = tasks.indexOf(act[j]);
+    tasks[a] = act[j]; tasks[b] = act[i];
+    act[i].at = act[j].at = Date.now();
+    tasksChanged();
+    var btn = document.querySelector('[data-tk="' + id + '"] [data-act="' + (dir < 0 ? 'up' : 'down') + '"]');
+    if (btn && !btn.disabled) btn.focus({ preventScroll: true });
+    else { btn = document.querySelector('[data-tk="' + id + '"] [data-act="' + (dir < 0 ? 'down' : 'up') + '"]'); if (btn) btn.focus({ preventScroll: true }); }
+  }
+  function renderManage() {
+    var fx = '';
+    CHECKLIST.forEach(function (it) {
+      fx += '<li class="tk-fx' + (it.children ? ' grp' : '') + '"><span class="nm">' + esc(it.title) + '</span><span class="tk-tag">' + LOCK_SVG + '默认</span></li>';
+      (it.children || []).forEach(function (c) { fx += '<li class="tk-fx sub"><span class="nm">' + esc(c.title) + '</span></li>'; });
+    });
+    $('tkFixed').innerHTML = fx;
+    var act = activeTasks();
+    var html = act.map(function (t, i) {
+      var nm = esc(t.title);
+      if (tkEdit === t.id) {
+        return '<li class="tk-item editing" data-tk="' + t.id + '"><input class="jc-input tk-input" type="text" value="' + nm + '" maxlength="40" enterkeyhint="done" autocomplete="off" aria-label="「' + nm + '」的新名称">' +
+          '<div class="tk-acts"><button type="button" class="btn btn-small" data-act="cancel">取消</button><button type="button" class="btn btn-small btn-primary" data-act="save">保存</button></div><p class="jc-err tk-ierr" role="alert"></p></li>';
+      }
+      if (tkAsk === t.id) {
+        return '<li class="tk-item asking" data-tk="' + t.id + '"><p class="tk-q">删除「' + nm + '」？从今天起不再计入，以前的打卡记录都保留。</p>' +
+          '<div class="tk-acts"><button type="button" class="btn btn-small" data-act="nodel">先不了</button><button type="button" class="btn btn-small btn-danger-solid" data-act="del">删除</button></div></li>';
+      }
+      return '<li class="tk-item" data-tk="' + t.id + '"><span class="nm">' + nm + iconSvg(taskIcon(t.title)) + '</span><div class="tk-acts">' +
+        '<button type="button" class="tk-ib" data-act="up" aria-label="上移「' + nm + '」"' + (i === 0 ? ' disabled' : '') + '>' + CHEV.up + '</button>' +
+        '<button type="button" class="tk-ib" data-act="down" aria-label="下移「' + nm + '」"' + (i === act.length - 1 ? ' disabled' : '') + '>' + CHEV.down + '</button>' +
+        '<button type="button" class="tk-tb" data-act="edit" aria-label="改名「' + nm + '」">改名</button>' +
+        '<button type="button" class="tk-tb del" data-act="ask" aria-label="删除「' + nm + '」">删除</button></div></li>';
+    }).join('');
+    $('tkList').innerHTML = html || '<li class="tk-empty">还没有自定义任务，在下面添加一个吧。</li>';
+    $('tkCount').textContent = act.length + ' 个';
+    var full = act.length >= TASK_LIMIT;
+    $('tkNew').disabled = full; $('tkAddBtn').disabled = full;
+    $('tkNew').placeholder = full ? '最多 ' + TASK_LIMIT + ' 个自定义任务' : '新任务，如：读书 20 分钟';
+    var inp = document.querySelector('.tk-input');
+    if (inp) { inp.focus({ preventScroll: true }); var L = inp.value.length; inp.setSelectionRange(L, L); }
+  }
+  function tkError(el, msg) {
+    el.textContent = msg || '';
+    el.classList.remove('emph'); if (msg) { void el.offsetWidth; el.classList.add('emph'); }
+  }
+  function openManage() {
+    checkRollover();
+    tkEdit = tkAsk = null;
+    tkError($('tkErr'), ''); $('tkNew').value = ''; $('tkAdd').classList.remove('missing');
+    renderManage();
+    $('tkMask').hidden = false;
+    $('tkBody').scrollTop = 0;
+    $('tkClose').focus({ preventScroll: true });
+  }
+  function closeManage() { $('tkMask').hidden = true; tkEdit = tkAsk = null; }
+  function initManage() {
+    $('manageBtn').addEventListener('click', openManage);
+    $('tkClose').addEventListener('click', closeManage);
+    $('tkMask').addEventListener('click', function (e) { if (e.target === this) closeManage(); });
+    $('tkAdd').addEventListener('submit', function (e) {
+      e.preventDefault();
+      var r = addTask($('tkNew').value);
+      if (r.err) { tkError($('tkErr'), r.err); $('tkAdd').classList.add('missing'); $('tkNew').focus(); return; }
+      tkError($('tkErr'), ''); $('tkAdd').classList.remove('missing'); $('tkNew').value = '';
+      toast('已添加「' + r.title + '」，从今天起算');
+      var body = $('tkBody'); body.scrollTop = body.scrollHeight;
+    });
+    $('tkNew').addEventListener('input', function () { if ($('tkErr').textContent) { tkError($('tkErr'), ''); $('tkAdd').classList.remove('missing'); } });
+    $('tkList').addEventListener('click', function (e) {
+      var b = e.target.closest('[data-act]'); if (!b || b.disabled) return;
+      var li = b.closest('[data-tk]'), id = li.dataset.tk, act = b.dataset.act;
+      if (act === 'up') moveTask(id, -1);
+      else if (act === 'down') moveTask(id, 1);
+      else if (act === 'edit') { tkEdit = id; tkAsk = null; renderManage(); }
+      else if (act === 'cancel') { tkEdit = null; renderManage(); focusAct(id, 'edit'); }
+      else if (act === 'save') saveRename(li);
+      else if (act === 'ask') { tkAsk = id; tkEdit = null; renderManage(); focusAct(id, 'nodel'); }
+      else if (act === 'nodel') { tkAsk = null; renderManage(); focusAct(id, 'ask'); }
+      else if (act === 'del') deleteTask(id);
+    });
+    $('tkList').addEventListener('keydown', function (e) {
+      if (!e.target.classList.contains('tk-input')) return;
+      if (e.key === 'Enter') { e.preventDefault(); saveRename(e.target.closest('[data-tk]')); }
+      else if (e.key === 'Escape') { e.stopPropagation(); var id = tkEdit; tkEdit = null; renderManage(); focusAct(id, 'edit'); }
+    });
+    $('tkList').addEventListener('input', function (e) {
+      if (!e.target.classList.contains('tk-input')) return;
+      var er = e.target.closest('[data-tk]').querySelector('.tk-ierr'); if (er.textContent) { tkError(er, ''); e.target.closest('[data-tk]').classList.remove('missing'); }
+    });
+  }
+  function focusAct(id, act) { var b = document.querySelector('[data-tk="' + id + '"] [data-act="' + act + '"]'); if (b) b.focus({ preventScroll: true }); }
+  function saveRename(li) {
+    var id = li.dataset.tk, inp = li.querySelector('.tk-input');
+    var r = renameTask(id, inp.value);
+    if (r.err) { tkError(li.querySelector('.tk-ierr'), r.err); li.classList.add('missing'); inp.focus(); return; }
+    toast('已改名为「' + r.title + '」');
+    focusAct(id, 'edit');
+  }
+
   /* ========= 导出 / 导入 / 清空 ========= */
   function exportData() {
     // days 里每天的 juecha（天气 / 压力 / 能量）原样导出
     var out = { app: 'xiuxing-rike', version: 1, appVersion: APP_VERSION, exportedAt: new Date().toISOString(), dayStartHour: DAY_START_HOUR,
-      checklist: CHECKLIST, days: data.days };
+      checklist: CHECKLIST.concat(leavesFor(currentKey).filter(function (l) { return l.custom; })),   // 给人看的：今天的清单
+      tasks: tasks, days: data.days };   // tasks：自定义任务（含已删除的，用于按当时清单计算历史）
     var blob = new Blob([JSON.stringify(out, null, 2)], { type: 'application/json' });
     var a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
@@ -1108,7 +1323,7 @@
       if (!/^\d{4}-\d{2}-\d{2}$/.test(k)) return;
       var src = obj.days[k];
       if (!src || typeof src !== 'object') return;
-      var dst = data.days[k] || (data.days[k] = { items: Array.isArray(src.items) ? src.items.slice() : LEAF_IDS.slice(), done: {} });
+      var dst = data.days[k] || (data.days[k] = { items: Array.isArray(src.items) ? src.items.slice() : leafIdsFor(k), done: {} });
       var sd = src.done && typeof src.done === 'object' ? src.done : {};
       Object.keys(sd).forEach(function (id) {
         var ts = Number(sd[id]);
@@ -1121,13 +1336,30 @@
       if (sj && (!dj || (sj.at || 0) > (dj.at || 0))) dst.juecha = sj;
       n++;
     });
+    // 自定义任务（v1.12）：旧备份没有 tasks 就保持本机清单；有就按 id 合并——本机没有的加到后面，两边都有时以后改的为准
+    var tn = 0;
+    if (Array.isArray(obj.tasks)) {
+      normTasks(obj.tasks).forEach(function (t) {
+        var cur = tasks.filter(function (x) { return x.id === t.id; })[0];
+        if (!cur) { tasks.push(t); tn++; return; }
+        if ((t.at || 0) > (cur.at || 0)) {
+          cur.title = t.title; cur.at = t.at;
+          if (t.since) cur.since = t.since; else delete cur.since;
+          if (t.until) cur.until = t.until; else delete cur.until;
+          tn++;
+        }
+      });
+      refreshLabels();
+    }
     save();
-    renderToday(); renderRecords();
+    buildList(); renderToday(); renderRecords();
     toast('已导入 ' + n + ' 天的记录（和现有记录合并）');
     return true;
   }
   function clearAll() {
+    var keep = data.tasks;   // 清空的是打卡记录；自定义任务清单保留
     data = emptyData();
+    data.tasks = keep; ensureTasks();
     ensureDay(currentKey);
     save();
     selectedKey = currentKey; viewMonth = monthOf(currentKey);
@@ -1155,7 +1387,6 @@
   /* ========= 启动 ========= */
   function init() {
     $('ver').textContent = APP_VERSION;
-    $('ruleCount').textContent = leafIdsFor(currentKey).length;
     if (!storageOk) $('storageWarn').hidden = false;
     buildList();
     ensureDay(currentKey);
@@ -1171,6 +1402,7 @@
       selectedKey = b.dataset.day; renderRecords();
     });
     initCalendar();
+    initManage();
     $('exportBtn').addEventListener('click', exportData);
     $('importBtn').addEventListener('click', function () { $('importFile').click(); });
     $('importFile').addEventListener('change', function () {
@@ -1204,7 +1436,7 @@
     $('dayDetail').addEventListener('click', function (e) { if (e.target.closest('[data-share-day]')) openShare(selectedKey); });
     $('shareClose').addEventListener('click', closeShare);
     $('shareMask').addEventListener('click', function (e) { if (e.target === this) closeShare(); });
-    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') { closeShare(); closeSutra(); closeJuecha(); closeYm(); $('confirmMask').hidden = true; } });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') { closeShare(); closeSutra(); closeJuecha(); closeYm(); closeManage(); $('confirmMask').hidden = true; } });
     $('shareDownload').addEventListener('click', downloadShare);
 
     // 跨过 5 点自动换天：定时检查 + 回到页面时检查
@@ -1215,7 +1447,7 @@
     // 其他标签页改了数据
     window.addEventListener('storage', function (e) {
       if (e.key !== STORE_KEY) return;
-      data = load(); renderToday(); renderRecords();
+      data = load(); ensureTasks(); buildList(); renderToday(); renderRecords(); if (!$('tkMask').hidden) renderManage();
     });
 
     if ('serviceWorker' in navigator && location.protocol === 'https:') {
@@ -1225,7 +1457,7 @@
 
   // 给测试和调试用的只读入口
   window.__rike = { todayKey: todayKey, drawShare: function (k) { return drawShare(k).toDataURL('image/png'); }, data: function () { return data; }, importText: importText, version: APP_VERSION, openJuecha: openJuecha,
-    lastStamp: function () { return lastStamp; }, shareIcons: function () { return shareIcons.slice(); },
+    lastStamp: function () { return lastStamp; }, tasks: function () { return JSON.parse(JSON.stringify(tasks)); }, leavesFor: function (k) { return leafIdsFor(k); }, cheerFor: cheerFor, cnNum: cnNum, shareIcons: function () { return shareIcons.slice(); },
     // 调试 / 测试用：指定印章画一张（word 文字、color 颜色名、shape 样式 id、angle 角度）
     drawShareWith: function (k, o) {
       var c = STAMP_COLORS.filter(function (x) { return x.name === o.color; })[0] || STAMP_COLORS[0];
